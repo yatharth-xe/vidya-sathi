@@ -1,0 +1,149 @@
+/* CSS Reset and Variables Design System */
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  
+  /* Premium Dark Mode HSL Colors */
+  --bg-primary: 224 25% 10%;
+  --bg-secondary: 224 25% 14%;
+  --bg-tertiary: 224 25% 18%;
+  
+  --accent-primary: 262 83% 58%;    /* Royal Indigo/Purple */
+  --accent-secondary: 190 95% 45%;  /* Electric Teal */
+  --accent-success: 142 70% 45%;    /* Emerald green */
+  --accent-warning: 38 92% 50%;     /* Rich Amber */
+  --accent-danger: 350 89% 60%;     /* Crimson Coral */
+  
+  --text-primary: 0 0% 95%;
+  --text-secondary: 224 15% 70%;
+  --text-muted: 224 10% 50%;
+  
+  --border-color: 224 20% 22%;
+  --glass-bg: rgba(16, 20, 35, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border-color)) transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: hsl(var(--bg-primary));
+  color: hsl(var(--text-primary));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Glassmorphism utility card */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 var(--glass-shadow);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Gradients */
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--accent-primary)) 0%, hsl(var(--accent-secondary)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--accent-primary)) 0%, hsl(var(--accent-secondary)) 100%);
+}
+
+/* Core layouts */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+/* Input Fields & Buttons standard styled */
+.input-field {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  background: hsl(var(--bg-tertiary));
+  border: 1px solid hsl(var(--border-color));
+  border-radius: 10px;
+  color: hsl(var(--text-primary));
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: hsl(var(--accent-primary));
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.btn-primary {
+  padding: 0.875rem 1.75rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, hsl(var(--accent-primary)) 0%, hsl(var(--accent-secondary)) 100%);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-color));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--text-muted));
+}
