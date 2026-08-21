@@ -372,6 +372,17 @@ const TeacherAssignment = () => {
             assignmentId={assignment.id}
             title={assignment.title}
             filePath={assignment.file_path}
+            loadPdf={(id) => teacherService.getAssignmentFileBlob(id)}
+            onDownload={async (id) => {
+              const url = await teacherService.getAssignmentFileBlob(id)
+              const link = document.createElement('a')
+              link.href = url
+              link.setAttribute('download', `assignment_${id}.pdf`)
+              document.body.appendChild(link)
+              link.click()
+              link.parentNode.removeChild(link)
+              URL.revokeObjectURL(url)
+            }}
           />
         </div>
 

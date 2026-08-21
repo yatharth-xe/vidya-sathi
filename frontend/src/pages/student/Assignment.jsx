@@ -174,6 +174,8 @@ const Assignment = () => {
             assignmentId={assignment.id}
             title={assignment.title}
             filePath={assignment.file_path}
+            loadPdf={(id) => studentService.getAssignmentFileBlob(id)}
+            onDownload={(id) => studentService.downloadAssignmentPDF(id)}
           />
         </div>
 

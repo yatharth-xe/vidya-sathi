@@ -11,7 +11,7 @@ import studentService from '../../services/studentService'
 import Loader from '../common/Loader'
 import ErrorState from '../common/ErrorState'
 
-const PDFViewer = ({ assignmentId, title, filePath }) => {
+const PDFViewer = ({ assignmentId, title, filePath, loadPdf, onDownload }) => {
   const [blobUrl, setBlobUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -21,7 +21,7 @@ const PDFViewer = ({ assignmentId, title, filePath }) => {
     let isMounted = true
 
     const fetchPDF = async () => {
-      if (!assignmentId) {
+      if (!assignmentId || !loadPdf) {
         setLoading(false)
         if (!filePath) {
           setError('No PDF file attached to this assignment.')
@@ -33,7 +33,7 @@ const PDFViewer = ({ assignmentId, title, filePath }) => {
       setError(null)
 
       try {
-        const url = await studentService.getAssignmentFileBlob(assignmentId)
+        const url = await loadPdf(assignmentId)
         if (isMounted) {
           currentBlobUrl = url
           setBlobUrl(url)
@@ -59,11 +59,11 @@ const PDFViewer = ({ assignmentId, title, filePath }) => {
         URL.revokeObjectURL(currentBlobUrl)
       }
     }
-  }, [assignmentId, filePath])
+  }, [assignmentId, filePath, loadPdf])
 
   const handleDownload = () => {
-    if (assignmentId) {
-      studentService.downloadAssignmentPDF(assignmentId).catch(console.error)
+    if (assignmentId && onDownload) {
+      onDownload(assignmentId).catch(console.error)
     }
   }
 

@@ -151,6 +151,42 @@ def get_assignment(
 
 
 # ---------------------------------------------------------------------------
+# Teacher: Get assignment PDF file
+# ---------------------------------------------------------------------------
+@router.get(
+    "/{assignment_id}/file",
+    summary="Get the PDF file for an assignment (teacher only — must own the classroom)",
+)
+def get_assignment_file(
+    assignment_id: int,
+    current_teacher: models.User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    assignment = crud.get_assignment(db, assignment_id)
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assignment not found",
+        )
+    _verify_classroom_owned_by_teacher(db, assignment.classroom_id, current_teacher.id)
+
+    if not assignment.file_path or not os.path.exists(assignment.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found on server",
+        )
+
+    # Use content-disposition to render in browser for PDF viewer if possible
+    filename = os.path.basename(assignment.file_path)
+    return FileResponse(
+        assignment.file_path,
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="inline"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Teacher: Upload PDF for an assignment
 # ---------------------------------------------------------------------------
 @router.post(

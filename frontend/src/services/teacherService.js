@@ -81,9 +81,17 @@ const teacherService = {
     const response = await api.post(
       `/api/v1/assignments/${assignmentId}/upload-pdf`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      { headers: { 'Content-Type': null } }
     )
     return response.data
+  },
+
+  /** Fetch PDF file as a blob url for viewing */
+  getAssignmentFileBlob: async (assignmentId) => {
+    const response = await api.get(`/api/v1/assignments/${assignmentId}/file`, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
   },
 
   // ── Assignment Questions ───────────────────────────────────────────────
