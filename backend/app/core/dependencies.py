@@ -40,3 +40,23 @@ def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+def get_current_teacher(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    if current_user.role != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to teachers only"
+        )
+    return current_user
+
+def get_current_student(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to students only"
+        )
+    return current_user

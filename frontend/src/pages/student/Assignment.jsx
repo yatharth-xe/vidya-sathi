@@ -1,189 +1,228 @@
+/**
+ * Student Assignment Page.
+ *
+ * Route: /student/assignment/:assignmentId or /student/classroom/:classId/assignment/:assignId
+ * Uses: GET /api/v1/student/assignments/{assignment_id}
+ *
+ * Layout:
+ *   Desktop: LEFT PDF Viewer | RIGHT Question Panel
+ *   Mobile: PDF above | Questions below
+ */
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import Navbar from '../../components/common/Navbar'
+import AppShell from '../../components/common/AppShell'
 import Sidebar from '../../components/common/Sidebar'
+import PageHeader from '../../components/common/PageHeader'
 import PDFViewer from '../../components/student/PDFViewer'
-import Quiz from '../../components/student/Quiz'
+import QuestionCard from '../../components/student/QuestionCard'
+import DoubtChat from '../../components/student/DoubtChat'
 import Loader from '../../components/common/Loader'
+import EmptyState from '../../components/common/EmptyState'
+import ErrorState from '../../components/common/ErrorState'
 import studentService from '../../services/studentService'
+import { formatDate } from '../../utils/helpers'
 
 const Assignment = () => {
-  const { classId, assignId } = useParams()
+  const { classId, assignId, assignmentId } = useParams()
+  const targetAssignmentId = parseInt(assignmentId || assignId)
+
   const navigate = useNavigate()
   const [classrooms, setClassrooms] = useState([])
   const [assignment, setAssignment] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const list = await studentService.getClassrooms()
-        setClassrooms(list)
-        
-        const currentClass = list.find(c => c.id === parseInt(classId))
-        const currentAssign = currentClass?.assignments?.find(a => a.id === parseInt(assignId))
-        setAssignment(currentAssign)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+  // Contextual doubt chat state
+  const [activeDoubtContext, setActiveDoubtContext] = useState(null)
+  const [showDoubtChat, setShowDoubtChat] = useState(false)
+
+  const fetchAssignmentData = async () => {
+    if (!targetAssignmentId || isNaN(targetAssignmentId)) {
+      setError('Invalid assignment ID.')
+      setLoading(false)
+      return
     }
-    fetchData()
-  }, [classId, assignId])
 
-  const handleManualSubmit = async () => {
-    setSubmitting(true)
+    setLoading(true)
+    setError(null)
     try {
-      await studentService.submitAssignment(parseInt(assignId))
-      alert('Assignment submitted successfully!')
-      navigate(`/student/classroom/${classId}`)
+      const [assignmentData, enrolledList] = await Promise.all([
+        studentService.getAssignment(targetAssignmentId),
+        studentService.getClassrooms().catch(() => []),
+      ])
+      setAssignment(assignmentData)
+      setClassrooms(enrolledList || [])
     } catch (err) {
-      alert('Submission failed.')
+      setError(err.message || 'Failed to load assignment details.')
     } finally {
-      setSubmitting(false)
+      setLoading(false)
     }
   }
 
+  useEffect(() => {
+    fetchAssignmentData()
+  }, [targetAssignmentId])
+
+  const handleAskDoubt = (context) => {
+    setActiveDoubtContext(context)
+    setShowDoubtChat(true)
+  }
+
+  const sidebar = <Sidebar classrooms={classrooms} />
+
+  const backRoute = classId ? `/student/classroom/${classId}` : '/student'
+
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Loader />
-          </main>
+      <AppShell sidebar={sidebar}>
+        <Loader message="Loading assignment & PDF document…" />
+      </AppShell>
+    )
+  }
+
+  if (error) {
+    return (
+      <AppShell sidebar={sidebar}>
+        <ErrorState message={error} onRetry={fetchAssignmentData} />
+        <div style={{ textAlign: 'center', marginTop: 'var(--sp-4)' }}>
+          <button className="btn btn-ghost" onClick={() => navigate(backRoute)}>
+            ← Back to Classroom
+          </button>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
   if (!assignment) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content">
-            <h3>Assignment not found</h3>
-          </main>
-        </div>
-      </div>
+      <AppShell sidebar={sidebar}>
+        <EmptyState
+          icon="🔍"
+          title="Assignment not found"
+          description="This assignment may have been removed or you don't have access to it."
+          action={
+            <button className="btn btn-ghost" onClick={() => navigate(backRoute)}>
+              ← Back to Classroom
+            </button>
+          }
+        />
+      </AppShell>
     )
   }
 
-  const submission = assignment.submissions?.[0]
-  const status = submission ? submission.status : 'pending'
-
-  // Mock quiz setup
-  const mockQuiz = {
-    title: `Assessment for ${assignment.title}`,
-    questions: [
-      {
-        id: 1,
-        question_text: "Which of the following represents a linear equation?",
-        option_a: "y = mx + c",
-        option_b: "y = ax^2 + bx + c",
-        option_c: "xy = c",
-        option_d: "x^2 + y^2 = r^2",
-        correct_option: "A"
-      },
-      {
-        id: 2,
-        question_text: "What is the degree of a quadratic polynomial?",
-        option_a: "1",
-        option_b: "2",
-        option_c: "3",
-        option_d: "Variable",
-        correct_option: "B"
-      }
-    ]
-  }
+  const questions = assignment.questions || []
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar classrooms={classrooms} />
-        <main className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
-          <div>
-            <span
-              onClick={() => navigate(`/student/classroom/${classId}`)}
-              style={{ fontSize: '0.85rem', color: 'hsl(var(--text-muted))', cursor: 'pointer' }}
+    <AppShell sidebar={sidebar}>
+      <PageHeader
+        breadcrumb={
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate(backRoute)}
+            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+          >
+            ← Back to Classroom
+          </button>
+        }
+        title={assignment.title}
+        description={
+          assignment.due_date
+            ? `Due date: ${formatDate(assignment.due_date)}${assignment.description ? ` • ${assignment.description}` : ''}`
+            : assignment.description || undefined
+        }
+        action={
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setActiveDoubtContext(null)
+              setShowDoubtChat((v) => !v)
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              ← Back to Classroom
-            </span>
-            <h1 style={{ fontSize: '2rem', marginTop: '0.5rem' }}>{assignment.title}</h1>
-            <p style={{ color: 'hsl(var(--text-secondary))', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-              {assignment.description}
-            </p>
-          </div>
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {showDoubtChat ? 'Hide Tutor' : 'Open AI Tutor'}
+          </button>
+        }
+      />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
-            
-            {/* Document PDF Viewer */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem' }}>Study Resources</h3>
-              <PDFViewer title={assignment.title} fileUrl={assignment.file_path} />
+      {/* Main Responsive Grid Layout */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: 'var(--sp-6)',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left Column: PDF Viewer */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600 }}>
+            Study Material (PDF)
+          </h2>
+          <PDFViewer
+            assignmentId={assignment.id}
+            title={assignment.title}
+            filePath={assignment.file_path}
+          />
+        </div>
+
+        {/* Right Column: Question Panel or Doubt Chat */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+          {showDoubtChat ? (
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>
+                AI Doubt Assistant
+              </h2>
+              <DoubtChat
+                context={activeDoubtContext}
+                onClose={() => setShowDoubtChat(false)}
+              />
             </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600 }}>
+                  Assignment Questions ({questions.length})
+                </h2>
+                <span className="text-caption text-muted">
+                  Click "Ask Doubt" on any question
+                </span>
+              </div>
 
-            {/* Quiz or submission details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem' }}>Assignment Tasks</h3>
-              
-              {status === 'pending' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <Quiz quiz={mockQuiz} />
-                  
-                  <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                    <h4 style={{ marginBottom: '0.5rem' }}>Submit Study File</h4>
-                    <p style={{ fontSize: '0.85rem', color: 'hsl(var(--text-muted))', marginBottom: '1rem' }}>
-                      If you've completed written questions, submit them directly.
-                    </p>
-                    <button
-                      onClick={handleManualSubmit}
-                      className="btn-primary"
-                      disabled={submitting}
-                      style={{ width: '100%' }}
-                    >
-                      {submitting ? 'Submitting...' : 'Mark as Completed'}
-                    </button>
-                  </div>
-                </div>
+              {questions.length === 0 ? (
+                <EmptyState
+                  icon="📝"
+                  title="No questions added yet"
+                  description="Your teacher hasn't added structured questions to this assignment document yet."
+                />
               ) : (
-                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-                  <h4 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Assignment Submitted</h4>
-                  <p style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))' }}>
-                    Your work was successfully turned in. Awaiting teacher grade.
-                  </p>
-                  {submission?.feedback && (
-                    <div style={{
-                      marginTop: '1.5rem',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid hsl(var(--border-color))',
-                      textAlign: 'left'
-                    }}>
-                      <span style={{ fontSize: '0.8rem', color: 'hsl(var(--text-muted))', fontWeight: '600' }}>
-                        Teacher's Feedback
-                      </span>
-                      <p style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>{submission.feedback}</p>
-                    </div>
-                  )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                  {questions.map((q) => (
+                    <QuestionCard
+                      key={q.id || q.question_number}
+                      question={q}
+                      assignmentId={assignment.id}
+                      onAskDoubt={handleAskDoubt}
+                    />
+                  ))}
                 </div>
               )}
             </div>
-
-          </div>
-
-        </main>
+          )}
+        </div>
       </div>
-    </div>
+    </AppShell>
   )
 }
 

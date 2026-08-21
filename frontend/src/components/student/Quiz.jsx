@@ -6,7 +6,10 @@ const Quiz = ({ quiz }) => {
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState(0)
 
+  const [validationError, setValidationError] = useState(null)
+
   const handleSelectOption = (questionId, option) => {
+    setValidationError(null)
     setAnswers(prev => ({
       ...prev,
       [questionId]: option
@@ -16,7 +19,7 @@ const Quiz = ({ quiz }) => {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (Object.keys(answers).length < quiz.questions.length) {
-      alert('Please answer all questions before submitting.')
+      setValidationError('Please answer all questions before submitting.')
       return
     }
 

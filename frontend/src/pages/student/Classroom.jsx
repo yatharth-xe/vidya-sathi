@@ -1,143 +1,161 @@
+/**
+ * Student Classroom page — view classroom info, teacher details, and assignments.
+ * Uses GET /api/v1/classrooms/{classroom_id} directly.
+ */
 import React, { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import Navbar from '../../components/common/Navbar'
+import { useParams, useNavigate } from 'react-router-dom'
+import AppShell from '../../components/common/AppShell'
 import Sidebar from '../../components/common/Sidebar'
+import PageHeader from '../../components/common/PageHeader'
 import AssignmentCard from '../../components/student/AssignmentCard'
-import ProgressCard from '../../components/student/ProgressCard'
 import DoubtChat from '../../components/student/DoubtChat'
 import Loader from '../../components/common/Loader'
+import EmptyState from '../../components/common/EmptyState'
+import ErrorState from '../../components/common/ErrorState'
 import studentService from '../../services/studentService'
 
 const Classroom = () => {
   const { classId } = useParams()
+  const navigate = useNavigate()
   const [classroom, setClassroom] = useState(null)
   const [classrooms, setClassrooms] = useState([])
-  const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('assignments') // 'assignments' or 'doubt-chat'
+  const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('assignments')
+
+  const fetchClassroomData = async () => {
+    if (!classId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const [classDetails, enrolledList] = await Promise.all([
+        studentService.getClassroom(parseInt(classId)),
+        studentService.getClassrooms().catch(() => []),
+      ])
+      setClassroom(classDetails)
+      setClassrooms(enrolledList || [])
+    } catch (err) {
+      setError(err.message || 'Failed to load classroom details.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const list = await studentService.getClassrooms()
-        setClassrooms(list)
-        
-        const details = list.find(c => c.id === parseInt(classId))
-        setClassroom(details)
-
-        const prog = await studentService.getProgress(parseInt(classId))
-        setProgress(prog)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
+    fetchClassroomData()
   }, [classId])
+
+  const sidebar = <Sidebar classrooms={classrooms} />
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Loader />
-          </main>
+      <AppShell sidebar={sidebar}>
+        <Loader message="Loading classroom…" />
+      </AppShell>
+    )
+  }
+
+  if (error) {
+    return (
+      <AppShell sidebar={sidebar}>
+        <ErrorState
+          message={error}
+          onRetry={fetchClassroomData}
+        />
+        <div style={{ textAlign: 'center', marginTop: 'var(--sp-4)' }}>
+          <button className="btn btn-ghost" onClick={() => navigate('/student')}>
+            ← Back to Student Dashboard
+          </button>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
   if (!classroom) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content">
-            <h3>Classroom not found</h3>
-          </main>
-        </div>
-      </div>
+      <AppShell sidebar={sidebar}>
+        <EmptyState
+          icon="🔍"
+          title="Classroom not found"
+          description="You may not be enrolled in this classroom or it may no longer exist."
+          action={
+            <button className="btn btn-primary" onClick={() => navigate('/student')}>
+              Back to Dashboard
+            </button>
+          }
+        />
+      </AppShell>
     )
   }
 
+  const TABS = [
+    { id: 'assignments', label: 'Assignments' },
+    { id: 'doubt-chat', label: 'AI Tutor (Ask Doubt)' },
+  ]
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar classrooms={classrooms} />
-        <main className="main-content" style={{ display: 'flex', gap: '2rem' }}>
-          
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div>
-              <h1 style={{ fontSize: '2rem' }}>{classroom.name}</h1>
-              <p style={{ color: 'hsl(var(--text-secondary))', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-                {classroom.description || 'No description provided.'}
-              </p>
-            </div>
+    <AppShell sidebar={sidebar}>
+      <PageHeader
+        breadcrumb={
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/student')} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}>
+            ← Back to Dashboard
+          </button>
+        }
+        title={classroom.name}
+        description={
+          classroom.teacher?.name
+            ? `Taught by ${classroom.teacher.name}${classroom.description ? ` • ${classroom.description}` : ''}`
+            : classroom.description || undefined
+        }
+      />
 
-            {/* Tab navigation */}
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid hsl(var(--border-color))', paddingBottom: '0.5rem' }}>
-              <span
-                onClick={() => setActiveTab('assignments')}
-                style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  padding: '0.5rem 1rem',
-                  borderBottom: activeTab === 'assignments' ? '2px solid hsl(var(--accent-primary))' : '2px solid transparent',
-                  color: activeTab === 'assignments' ? 'hsl(var(--text-primary))' : 'hsl(var(--text-muted))'
-                }}
-              >
-                Assignments
-              </span>
-              <span
-                onClick={() => setActiveTab('doubt-chat')}
-                style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  padding: '0.5rem 1rem',
-                  borderBottom: activeTab === 'doubt-chat' ? '2px solid hsl(var(--accent-primary))' : '2px solid transparent',
-                  color: activeTab === 'doubt-chat' ? 'hsl(var(--text-primary))' : 'hsl(var(--text-muted))'
-                }}
-              >
-                AI Doubt Chat
-              </span>
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
+        {/* Navigation Tabs */}
+        <div className="tabs" role="tablist">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab-item${activeTab === tab.id ? ' active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`tabpanel-${tab.id}`}
+              id={`tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-            {/* Tab contents */}
-            {activeTab === 'assignments' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {classroom.assignments?.length === 0 ? (
-                  <p style={{ color: 'hsl(var(--text-muted))', fontStyle: 'italic', padding: '1rem' }}>
-                    No assignments published yet.
-                  </p>
-                ) : (
-                  classroom.assignments?.map(assign => (
-                    <AssignmentCard key={assign.id} assignment={assign} />
-                  ))
-                )}
-              </div>
+        {/* Tab Panel Content */}
+        <div role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+          {activeTab === 'assignments' ? (
+            !classroom.assignments || classroom.assignments.length === 0 ? (
+              <EmptyState
+                icon="📋"
+                title="No assignments yet"
+                description="Your teacher hasn't published any assignments for this classroom yet."
+              />
             ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                <div style={{ fontSize: '0.875rem', color: 'hsl(var(--color-text-3))' }}>
+                  {classroom.assignments.length} {classroom.assignments.length === 1 ? 'assignment' : 'assignments'} available
+                </div>
+                <div className="grid-cards">
+                  {classroom.assignments.map((assign) => (
+                    <AssignmentCard key={assign.id} assignment={assign} />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : (
+            <div style={{ maxWidth: 720 }}>
               <DoubtChat />
-            )}
-          </div>
-
-          {/* Right Sidebar stats card */}
-          {progress && (
-            <div style={{ width: '320px', flexShrink: 0 }}>
-              <ProgressCard progress={progress} />
             </div>
           )}
-
-        </main>
+        </div>
       </div>
-    </div>
+    </AppShell>
   )
 }
 

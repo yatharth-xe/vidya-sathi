@@ -85,6 +85,29 @@ def create_assignment(
     db.refresh(db_assignment)
     return db_assignment
 
+def update_assignment_file_path(
+    db: Session,
+    assignment_id: int,
+    file_path: str
+) -> Optional[models.Assignment]:
+    """Persist the uploaded PDF path to an existing assignment row."""
+    assignment = get_assignment(db, assignment_id)
+    if assignment:
+        assignment.file_path = file_path
+        db.commit()
+        db.refresh(assignment)
+    return assignment
+
+def is_student_enrolled(db: Session, student_id: int, classroom_id: int) -> bool:
+    """Return True if the given student is a member of the classroom."""
+    classroom = get_classroom(db, classroom_id)
+    if not classroom:
+        return False
+    student = get_user(db, student_id)
+    if not student:
+        return False
+    return student in classroom.students
+
 # ==================== Assignment Questions CRUD ====================
 def get_questions_by_assignment(db: Session, assignment_id: int) -> List[models.AssignmentQuestion]:
     return db.query(models.AssignmentQuestion).filter(

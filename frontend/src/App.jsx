@@ -9,6 +9,7 @@ import Register from './pages/auth/Register'
 import StudentDashboard from './pages/student/Dashboard'
 import StudentClassroom from './pages/student/Classroom'
 import StudentAssignment from './pages/student/Assignment'
+import StudentPracticeQuiz from './pages/student/PracticeQuiz'
 import TeacherDashboard from './pages/teacher/Dashboard'
 import TeacherClassroom from './pages/teacher/Classroom'
 import TeacherAssignment from './pages/teacher/Assignment'
@@ -36,6 +37,16 @@ function App() {
           <Route path="/student/classroom/:classId/assignment/:assignId" element={
             <ProtectedRoute allowedRoles={['student']}>
               <StudentAssignment />
+            </ProtectedRoute>
+          } />
+          <Route path="/student/assignment/:assignmentId" element={
+            <ProtectedRoute allowedRoles={['student']}>
+              <StudentAssignment />
+            </ProtectedRoute>
+          } />
+          <Route path="/student/practice/:quizId" element={
+            <ProtectedRoute allowedRoles={['student']}>
+              <StudentPracticeQuiz />
             </ProtectedRoute>
           } />
 

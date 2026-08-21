@@ -1,17 +1,27 @@
+/**
+ * Teacher Dashboard — lists classrooms with create form.
+ * Uses AppShell for consistent layout.
+ * API + auth logic unchanged.
+ */
 import React, { useState, useEffect } from 'react'
-import Navbar from '../../components/common/Navbar'
+import AppShell from '../../components/common/AppShell'
 import Sidebar from '../../components/common/Sidebar'
+import PageHeader from '../../components/common/PageHeader'
 import ClassroomCard from '../../components/teacher/ClassroomCard'
 import Loader from '../../components/common/Loader'
+import EmptyState from '../../components/common/EmptyState'
 import teacherService from '../../services/teacherService'
+import useAuth from '../../hooks/useAuth'
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const [classrooms, setClassrooms] = useState([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   const fetchClassrooms = async () => {
     try {
@@ -24,112 +34,158 @@ const Dashboard = () => {
     }
   }
 
-  useEffect(() => {
-    fetchClassrooms()
-  }, [])
+  useEffect(() => { fetchClassrooms() }, [])
 
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!name.trim()) return
-
     setCreating(true)
     setError('')
     try {
       await teacherService.createClassroom(name, description)
       setName('')
       setDescription('')
+      setShowForm(false)
       fetchClassrooms()
-    } catch (err) {
-      setError('Could not create classroom.')
+    } catch {
+      setError('Could not create classroom. Please try again.')
     } finally {
       setCreating(false)
     }
   }
 
+  const sidebar = <Sidebar classrooms={classrooms} />
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar classrooms={classrooms} />
-        <main className="main-content" style={{ display: 'flex', gap: '2rem' }}>
-          
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div>
-              <h1 style={{ fontSize: '2rem' }}>Teacher Dashboard</h1>
-              <p style={{ color: 'hsl(var(--text-secondary))', fontSize: '0.95rem' }}>
-                Monitor classrooms, assign study works, and check AI-generated student insights.
-              </p>
-            </div>
+    <AppShell sidebar={sidebar}>
+      <PageHeader
+        breadcrumb="Dashboard"
+        title={`Welcome back, ${user?.name?.split(' ')[0] ?? 'Teacher'}`}
+        description="Manage your classrooms, publish assignments, and view AI-generated student insights."
+        action={
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowForm(v => !v)}
+            aria-expanded={showForm}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New classroom
+          </button>
+        }
+      />
 
-            {loading ? (
-              <Loader />
-            ) : classrooms.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎓</div>
-                <h3>Welcome Teacher</h3>
-                <p style={{ color: 'hsl(var(--text-secondary))', marginTop: '0.5rem' }}>
-                  Create your first virtual classroom on the right to start teaching.
-                </p>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '1.5rem'
-              }}>
-                {classrooms.map((c) => (
-                  <ClassroomCard key={c.id} classroom={c} />
-                ))}
-              </div>
+      {/* Create classroom form — collapsible */}
+      {showForm && (
+        <div
+          className="card card-padding"
+          style={{ marginBottom: 'var(--sp-6)', maxWidth: 520 }}
+        >
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '1rem',
+            fontWeight: 600,
+            marginBottom: 'var(--sp-5)',
+          }}>
+            Create a new classroom
+          </h2>
+
+          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+            {error && (
+              <div className="alert alert-danger" role="alert">{error}</div>
             )}
-          </div>
 
-          {/* Quick Create Sidebar Panel */}
-          <div style={{ width: '320px', flexShrink: 0 }}>
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.2rem', marginBottom: '1.25rem' }}>Create Classroom</h3>
-              
-              <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {error && (
-                  <span style={{ fontSize: '0.8rem', color: 'hsl(350, 89%, 60%)' }}>
-                    {error}
-                  </span>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'hsl(var(--text-secondary))' }}>Class Name</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Mathematics Class X"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'hsl(var(--text-secondary))' }}>Description</label>
-                  <textarea
-                    className="input-field"
-                    placeholder="Brief details about schedule, modules..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem', minHeight: '80px', resize: 'vertical' }}
-                  />
-                </div>
-
-                <button type="submit" className="btn-primary" disabled={creating} style={{ marginTop: '0.5rem' }}>
-                  {creating ? 'Creating...' : 'Create Class'}
-                </button>
-              </form>
+            <div className="form-field">
+              <label htmlFor="class-name" className="form-label">Classroom name <span aria-hidden="true" style={{ color: 'hsl(var(--color-danger))' }}>*</span></label>
+              <input
+                id="class-name"
+                type="text"
+                className="input-field"
+                placeholder="e.g. Mathematics — Class X"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                disabled={creating}
+                autoFocus
+              />
             </div>
-          </div>
 
-        </main>
-      </div>
-    </div>
+            <div className="form-field">
+              <label htmlFor="class-desc" className="form-label">Description <span style={{ color: 'hsl(var(--color-text-3))', fontWeight: 400 }}>(optional)</span></label>
+              <textarea
+                id="class-desc"
+                className="input-field"
+                placeholder="Brief overview of topics, schedule, or goals…"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={creating}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--sp-3)', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => { setShowForm(false); setError('') }}
+                disabled={creating}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating || !name.trim()}
+              >
+                {creating ? (
+                  <>
+                    <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} aria-hidden="true" />
+                    Creating…
+                  </>
+                ) : 'Create classroom'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Classrooms grid */}
+      {loading ? (
+        <Loader message="Loading your classrooms…" />
+      ) : classrooms.length === 0 ? (
+        <EmptyState
+          icon="🏫"
+          title="No classrooms yet"
+          description="Create your first classroom to start adding students and publishing assignments."
+          action={
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+              Create your first classroom
+            </button>
+          }
+        />
+      ) : (
+        <>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 'var(--sp-4)',
+          }}>
+            <span style={{ fontSize: '0.875rem', color: 'hsl(var(--color-text-3))' }}>
+              {classrooms.length} {classrooms.length === 1 ? 'classroom' : 'classrooms'}
+            </span>
+          </div>
+          <div className="grid-cards">
+            {classrooms.map((c) => (
+              <ClassroomCard key={c.id} classroom={c} />
+            ))}
+          </div>
+        </>
+      )}
+    </AppShell>
   )
 }
 

@@ -1,72 +1,105 @@
+/**
+ * Student AssignmentCard — shows assignment status, due date, grade.
+ * Uses student-friendly language (no "weak", "at risk").
+ * Navigates to assignment page on button click.
+ */
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { formatDate } from '../../utils/helpers'
+
+const STATUS_CONFIG = {
+  graded: {
+    label: 'Graded',
+    badgeClass: 'badge-success',
+  },
+  submitted: {
+    label: 'Submitted',
+    badgeClass: 'badge-primary',
+  },
+  pending: {
+    label: 'Not started',
+    badgeClass: 'badge-warning',
+  },
+}
 
 const AssignmentCard = ({ assignment }) => {
   const { classId } = useParams()
   const navigate = useNavigate()
 
   const submission = assignment.submissions?.[0]
-  const status = submission ? submission.status : 'pending'
-  const grade = submission ? submission.grade : null
-
-  const getStatusStyle = () => {
-    switch (status) {
-      case 'graded':
-        return { background: 'rgba(34, 197, 94, 0.1)', color: 'hsl(142, 70%, 45%)' }
-      case 'submitted':
-        return { background: 'rgba(59, 130, 246, 0.1)', color: 'hsl(190, 95%, 45%)' }
-      default:
-        return { background: 'rgba(245, 158, 11, 0.1)', color: 'hsl(38, 92%, 50%)' }
-    }
-  }
+  const statusKey = submission ? submission.status : 'pending'
+  const grade = submission?.grade ?? null
+  const config = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.pending
 
   return (
-    <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <h4 style={{ fontSize: '1.1rem' }}>{assignment.title}</h4>
-        <span style={{
-          fontSize: '0.75rem',
-          padding: '0.2rem 0.5rem',
-          borderRadius: '4px',
-          textTransform: 'capitalize',
-          fontWeight: '600',
-          ...getStatusStyle()
+    <article
+      className="card"
+      style={{ padding: 'var(--sp-5)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}
+    >
+      {/* Title + status badge */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--sp-2)' }}>
+        <h4 style={{
+          fontSize: '0.9375rem',
+          fontWeight: 600,
+          color: 'hsl(var(--color-text))',
+          lineHeight: 1.35,
+          flex: 1,
         }}>
-          {status}
+          {assignment.title}
+        </h4>
+        <span className={`badge ${config.badgeClass}`} style={{ flexShrink: 0 }}>
+          {config.label}
         </span>
       </div>
 
-      <p style={{ fontSize: '0.85rem', color: 'hsl(var(--text-secondary))' }}>
-        {assignment.description || 'No description provided.'}
-      </p>
+      {/* Description */}
+      {assignment.description && (
+        <p style={{
+          fontSize: '0.8125rem',
+          color: 'hsl(var(--color-text-2))',
+          lineHeight: 1.5,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {assignment.description}
+        </p>
+      )}
 
+      {/* Footer */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: '0.5rem',
-        borderTop: '1px solid hsl(var(--border-color))',
-        paddingTop: '0.75rem',
-        fontSize: '0.8rem'
+        paddingTop: 'var(--sp-2)',
+        borderTop: '1px solid hsl(var(--color-border))',
+        flexWrap: 'wrap',
+        gap: 'var(--sp-2)',
       }}>
-        <span style={{ color: 'hsl(var(--text-muted))' }}>
-          Due: {formatDate(assignment.due_date)}
-        </span>
-        {status === 'graded' && grade !== null && (
-          <span style={{ fontWeight: '600', color: 'hsl(142, 70%, 45%)' }}>
-            Grade: {grade}/100
+        <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
+          <span style={{ fontSize: '0.75rem', color: 'hsl(var(--color-text-3))' }}>
+            Due: {formatDate(assignment.due_date)}
           </span>
-        )}
+          {statusKey === 'graded' && grade !== null && (
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'hsl(var(--color-success))',
+            }}>
+              Score: {grade}/100
+            </span>
+          )}
+        </div>
         <button
           onClick={() => navigate(`/student/classroom/${classId}/assignment/${assignment.id}`)}
-          className="btn-primary"
-          style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+          className="btn btn-primary btn-sm"
+          aria-label={`${statusKey === 'pending' ? 'Start' : 'View'} ${assignment.title}`}
         >
-          {status === 'pending' ? 'Start Assignment' : 'View Work'}
+          {statusKey === 'pending' ? 'Start' : 'View work'}
         </button>
       </div>
-    </div>
+    </article>
   )
 }
 

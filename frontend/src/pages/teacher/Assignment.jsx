@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import Navbar from '../../components/common/Navbar'
+import AppShell from '../../components/common/AppShell'
 import Sidebar from '../../components/common/Sidebar'
+import PageHeader from '../../components/common/PageHeader'
 import PDFViewer from '../../components/student/PDFViewer'
 import Loader from '../../components/common/Loader'
+import EmptyState from '../../components/common/EmptyState'
 import teacherService from '../../services/teacherService'
 
 const TeacherAssignment = () => {
@@ -52,173 +54,129 @@ const TeacherAssignment = () => {
       setGradeInput('')
       setFeedbackInput('')
     } catch (err) {
-      alert('Failed to update grade.')
+      console.error('Failed to update grade:', err)
     } finally {
       setSubmittingGrade(false)
     }
   }
 
+  const sidebar = <Sidebar classrooms={classrooms} />
+
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Loader />
-          </main>
-        </div>
-      </div>
+      <AppShell sidebar={sidebar}>
+        <Loader message="Loading assignment…" />
+      </AppShell>
     )
   }
 
   if (!assignment) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ display: 'flex', flex: 1 }}>
-          <Sidebar classrooms={classrooms} />
-          <main className="main-content">
-            <span
-              onClick={() => navigate(`/teacher/classroom/${classId}`)}
-              style={{ fontSize: '0.85rem', color: 'hsl(var(--text-muted))', cursor: 'pointer' }}
-            >
-              ← Back to Classroom
-            </span>
-            <h3 style={{ marginTop: '1rem' }}>Assignment not found</h3>
-          </main>
-        </div>
-      </div>
+      <AppShell sidebar={sidebar}>
+        <EmptyState icon="🔍" title="Assignment not found"
+          description="This assignment may have been removed."
+          action={<button className="btn btn-ghost" onClick={() => navigate(`/teacher/classroom/${classId}`)}>← Back to classroom</button>}
+        />
+      </AppShell>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar classrooms={classrooms} />
-        <main className="main-content" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
-          <div>
-            <span
-              onClick={() => navigate(`/teacher/classroom/${classId}`)}
-              style={{ fontSize: '0.85rem', color: 'hsl(var(--text-muted))', cursor: 'pointer' }}
-            >
-              ← Back to Classroom
-            </span>
-            <h1 style={{ fontSize: '2rem', marginTop: '0.5rem' }}>{assignment.title}</h1>
-            <p style={{ color: 'hsl(var(--text-secondary))', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-              {assignment.description || 'No specific instructions provided.'}
-            </p>
-          </div>
+    <AppShell sidebar={sidebar}>
+      <PageHeader
+        breadcrumb={<button className="btn btn-ghost btn-sm" onClick={() => navigate(`/teacher/classroom/${classId}`)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}>← Back to classroom</button>}
+        title={assignment.title}
+        description={assignment.description || 'No specific instructions provided.'}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 'var(--sp-6)' }}>
             
             {/* PDF / Materials viewer */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem' }}>Assignment Document</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600 }}>Assignment Document</h2>
               <PDFViewer title={assignment.title} fileUrl={assignment.file_path} />
             </div>
 
             {/* Student Submissions List & Grading */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem' }}>Student Submissions ({submissions.length})</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600 }}>Student submissions ({submissions.length})</h2>
               
               {submissions.length === 0 ? (
-                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
-                  <p style={{ color: 'hsl(var(--text-muted))', fontSize: '0.9rem' }}>
-                    No student submissions recorded yet for this assignment.
-                  </p>
-                </div>
+                <EmptyState icon="📭" title="No submissions yet"
+                  description="Students haven't submitted this assignment yet."
+                />
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
                   {submissions.map((sub) => (
-                    <div key={sub.id} className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div key={sub.id} className="card card-padding" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <h4 style={{ fontSize: '1rem', fontWeight: '600' }}>
+                          <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>
                             {sub.student_name || `Student #${sub.student_id}`}
-                          </h4>
-                          <span style={{ fontSize: '0.75rem', color: 'hsl(var(--text-muted))' }}>
-                            Submitted on {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}
-                          </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'hsl(var(--color-text-3))' }}>
+                            Submitted: {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'N/A'}
+                          </div>
                         </div>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '12px',
-                          background: sub.status === 'graded' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(250, 204, 21, 0.15)',
-                          color: sub.status === 'graded' ? '#4ade80' : '#facc15',
-                          fontWeight: '600'
-                        }}>
-                          {sub.status.toUpperCase()}
+                        <span className={`badge ${sub.status === 'graded' ? 'badge-success' : 'badge-warning'}`}>
+                          {sub.status}
                         </span>
                       </div>
 
-                      {sub.grade !== null && sub.grade !== undefined && (
-                        <div style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))' }}>
+                      {sub.grade != null && (
+                        <div style={{ fontSize: '0.875rem', color: 'hsl(var(--color-text-2))' }}>
                           <strong>Grade:</strong> {sub.grade}/100
                         </div>
                       )}
 
                       {sub.feedback && (
                         <div style={{
-                          padding: '0.75rem',
-                          borderRadius: '6px',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid hsl(var(--border-color))',
-                          fontSize: '0.85rem'
+                          padding: 'var(--sp-3)',
+                          borderRadius: 'var(--r-md)',
+                          background: 'hsl(var(--color-surface-2))',
+                          border: '1px solid hsl(var(--color-border))',
+                          fontSize: '0.8125rem',
+                          color: 'hsl(var(--color-text-2))'
                         }}>
                           <strong>Feedback:</strong> {sub.feedback}
                         </div>
                       )}
 
                       {gradingId === sub.id ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
                           <input
                             type="number"
-                            placeholder="Grade (0-100)"
+                            placeholder="Grade (0–100)"
                             className="input-field"
                             value={gradeInput}
                             onChange={(e) => setGradeInput(e.target.value)}
-                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                            min="0" max="100"
                           />
                           <textarea
-                            placeholder="Add feedback for student..."
+                            placeholder="Feedback for the student…"
                             className="input-field"
                             value={feedbackInput}
                             onChange={(e) => setFeedbackInput(e.target.value)}
-                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', minHeight: '60px' }}
                           />
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                              onClick={() => handleGradeSubmit(sub.id)}
-                              className="btn-primary"
-                              disabled={submittingGrade}
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                            >
-                              Save Grade
+                          <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+                            <button onClick={() => handleGradeSubmit(sub.id)}
+                              className="btn btn-primary btn-sm" disabled={submittingGrade}>
+                              Save grade
                             </button>
-                            <button
-                              onClick={() => setGradingId(null)}
-                              className="btn-secondary"
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                            >
+                            <button onClick={() => setGradingId(null)}
+                              className="btn btn-ghost btn-sm">
                               Cancel
                             </button>
                           </div>
                         </div>
                       ) : (
                         <button
-                          onClick={() => {
-                            setGradingId(sub.id)
-                            setGradeInput(sub.grade || '')
-                            setFeedbackInput(sub.feedback || '')
-                          }}
-                          className="btn-secondary"
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', alignSelf: 'flex-start' }}
+                          onClick={() => { setGradingId(sub.id); setGradeInput(sub.grade || ''); setFeedbackInput(sub.feedback || '') }}
+                          className="btn btn-ghost btn-sm"
+                          style={{ alignSelf: 'flex-start' }}
                         >
-                          {sub.status === 'graded' ? 'Edit Grade' : 'Grade Submission'}
+                          {sub.status === 'graded' ? 'Edit grade' : 'Grade submission'}
                         </button>
                       )}
                     </div>
@@ -226,12 +184,9 @@ const TeacherAssignment = () => {
                 </div>
               )}
             </div>
-
           </div>
-
-        </main>
       </div>
-    </div>
+    </AppShell>
   )
 }
 

@@ -1,25 +1,23 @@
+/**
+ * Loader — page and inline loading states.
+ * Uses CSS-based spinner with design token colors.
+ *
+ * Props:
+ *   fullPage {boolean} — centers spinner in full viewport
+ *   message  {string}  — optional text below spinner
+ *   size     {string}  — 'sm' | 'md' (default)
+ */
 import React from 'react'
 
-const Loader = ({ fullPage = false }) => {
+const Loader = ({ fullPage = false, message = 'Loading...', size = 'md' }) => {
   const spinner = (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-      <div style={{
-        width: '40px',
-        height: '40px',
-        border: '3px solid rgba(255, 255, 255, 0.05)',
-        borderTop: '3px solid hsl(262, 83%, 58%)',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-      }} />
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-      <span style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))', fontFamily: 'var(--font-sans)' }}>
-        Loading Vidya Sathi...
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-3)' }}>
+      <div className={`spinner${size === 'lg' ? ' spinner-lg' : ''}`} role="status" aria-label={message} />
+      {message && (
+        <span style={{ fontSize: '0.875rem', color: 'hsl(var(--color-text-3))' }}>
+          {message}
+        </span>
+      )}
     </div>
   )
 
@@ -30,7 +28,7 @@ const Loader = ({ fullPage = false }) => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        backgroundColor: 'hsl(var(--bg-primary))'
+        backgroundColor: 'hsl(var(--color-bg))',
       }}>
         {spinner}
       </div>
@@ -38,7 +36,13 @@ const Loader = ({ fullPage = false }) => {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', padding: '2rem', width: '100%', justifyContent: 'center' }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 'var(--sp-12)',
+      width: '100%',
+    }}>
       {spinner}
     </div>
   )
