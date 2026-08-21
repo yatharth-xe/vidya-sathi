@@ -70,7 +70,8 @@ const Assignment = () => {
 
   const sidebar = <Sidebar classrooms={classrooms} />
 
-  const backRoute = classId ? `/student/classroom/${classId}` : '/student'
+  const validClassId = classId && classId !== 'undefined' ? classId : (assignment?.classroom_id || null)
+  const backRoute = validClassId ? `/student/classroom/${validClassId}` : '/student'
 
   if (loading) {
     return (
@@ -187,6 +188,7 @@ const Assignment = () => {
                 AI Doubt Assistant
               </h2>
               <DoubtChat
+                assignmentId={assignment.id}
                 context={activeDoubtContext}
                 onClose={() => setShowDoubtChat(false)}
               />

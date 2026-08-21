@@ -92,7 +92,13 @@ const AssignmentCard = ({ assignment }) => {
           )}
         </div>
         <button
-          onClick={() => navigate(`/student/classroom/${classId}/assignment/${assignment.id}`)}
+          onClick={() => {
+            if (classId && classId !== 'undefined') {
+              navigate(`/student/classroom/${classId}/assignment/${assignment.id}`)
+            } else {
+              navigate(`/student/assignment/${assignment.id}`)
+            }
+          }}
           className="btn btn-primary btn-sm"
           aria-label={`${statusKey === 'pending' ? 'Start' : 'View'} ${assignment.title}`}
         >

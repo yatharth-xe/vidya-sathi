@@ -16,7 +16,7 @@ import studentService from '../../services/studentService'
 import ChatMessage from './ChatMessage'
 import ErrorState from '../common/ErrorState'
 
-const DoubtChat = ({ context, onClose }) => {
+const DoubtChat = ({ assignmentId, context, onClose }) => {
   const navigate = useNavigate()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -65,11 +65,20 @@ const DoubtChat = ({ context, onClose }) => {
     setLoading(true)
     setError(null)
 
+    const targetAssignmentId = parseInt(assignmentId || context?.assignmentId, 10)
+    const questionId = context?.questionId ? parseInt(context.questionId, 10) : undefined
+
+    if (isNaN(targetAssignmentId)) {
+      setError('Invalid assignment context. Please refresh the page and try again.')
+      setLoading(false)
+      return
+    }
+
     try {
       // Call backend Student Agent endpoint (student_id comes from JWT)
       const data = await agentService.sendStudentDoubt({
-        assignmentId: context?.assignmentId,
-        questionId: context?.questionId,
+        assignmentId: targetAssignmentId,
+        questionId: isNaN(questionId) ? undefined : questionId,
         message: userText,
       })
 
@@ -101,13 +110,13 @@ const DoubtChat = ({ context, onClose }) => {
     setStartingQuiz(true)
     setError(null)
     try {
-      const assignmentId = context?.assignmentId || 1
+      const practiceAssignmentId = parseInt(assignmentId || context?.assignmentId, 10) || 1
       const questionId = context?.questionId
       const topic = msg.topic || context?.topic || 'General Practice'
 
       // POST /api/v1/student/quiz/start -> receive quiz_id + 5 questions
       const quizData = await studentService.startPracticeQuiz({
-        assignmentId,
+        assignmentId: practiceAssignmentId,
         questionId,
         topic,
       })
@@ -116,7 +125,7 @@ const DoubtChat = ({ context, onClose }) => {
       navigate(`/student/practice/${quizData.quiz_id}`, {
         state: {
           quizData,
-          assignmentId,
+          assignmentId: practiceAssignmentId,
           questionId,
           topic,
         },

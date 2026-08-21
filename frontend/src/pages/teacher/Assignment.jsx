@@ -118,7 +118,9 @@ const TeacherAssignment = () => {
   }
 
   const sidebar = <Sidebar classrooms={classrooms} />
-  const backRoute = classId ? `/teacher/classroom/${classId}` : '/teacher'
+
+  const validClassId = classId && classId !== 'undefined' ? classId : (assignment?.classroom_id || null)
+  const backRoute = validClassId ? `/teacher/classroom/${validClassId}` : '/teacher'
 
   if (loading) {
     return (

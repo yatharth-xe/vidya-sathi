@@ -18,11 +18,16 @@ const agentService = {
    * Note: student_id is derived from JWT header by the backend.
    */
   sendStudentDoubt: async ({ assignmentId, questionId, message }) => {
-    const response = await api.post('/api/v1/agents/student/chat', {
-      assignment_id: parseInt(assignmentId),
-      question_id: questionId ? parseInt(questionId) : undefined,
+    const payload = {
+      assignment_id: parseInt(assignmentId, 10),
       message,
-    })
+    }
+
+    if (questionId && !isNaN(parseInt(questionId, 10))) {
+      payload.question_id = parseInt(questionId, 10)
+    }
+
+    const response = await api.post('/api/v1/agents/student/chat', payload)
     return response.data
   },
 

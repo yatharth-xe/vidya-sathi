@@ -15,7 +15,7 @@ const QuestionCard = ({ question, assignmentId, onAskDoubt }) => {
     if (onAskDoubt) {
       onAskDoubt({
         assignmentId,
-        questionId: id || question_number,
+        questionId: id,
         questionText: question_text,
         subject: subject || null,
         topic: topic || null,
