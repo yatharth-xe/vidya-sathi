@@ -1,8 +1,8 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_db
-from app.database import crud
+from app.core.dependencies import get_db, get_current_teacher
+from app.database import models, crud
 from app.schemas import progress as progress_schemas
 from app.services import progress_service
 
@@ -17,10 +17,10 @@ def get_classroom_analytics(
 
 @router.get("/notifications")
 def get_notifications(
-    teacher_id: int = 1, # Phase 1 stub parameter
+    current_teacher: models.User = Depends(get_current_teacher),
     db: Session = Depends(get_db)
 ):
-    notifications = crud.get_unread_notifications(db, teacher_id)
+    notifications = crud.get_unread_notifications(db, current_teacher.id)
     return [
         {
             "id": n.id,

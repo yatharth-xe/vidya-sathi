@@ -1,137 +1,82 @@
 """
-Teacher Agent Adapter — Integration boundary for ML Member 3.
+Teacher Agent Adapter — Real Grounded Teacher Reasoning Module.
 
-ARCHITECTURE
-============
-API route
-    ↓
-agent_service.run_teacher_insights()
-    ↓
-TeacherAgentAdapter.analyze()     ← ML MEMBER 3 PLUGS IN HERE
-    ↓
-Actual LLM analytics / risk reasoning
-
-HOW TO PLUG IN YOUR IMPLEMENTATION
-===================================
-1. Implement a class that satisfies the TeacherAgentAdapter interface below.
-2. Replace the DefaultTeacherAgentAdapter instantiation at the bottom of
-   this file with your implementation:
-
-       _teacher_agent = YourTeacherAgentImpl()
-
-3. Your class MUST:
-   - Accept a TeacherAgentRequest
-   - Return a TeacherAgentResponse
-   - Never execute SQL directly — all data is pre-loaded in the request
-   - Return properly typed Pydantic objects (not raw dicts)
-
-4. The TeacherAgentRequest already contains:
-   - student_progress_summary      list of progress rows
-   - weak_topics                   pre-computed from DB
-   - weak_subjects                 pre-computed from DB
-   - level_3_student_ids           pre-computed
-   - level_4_student_ids           pre-computed
-   - difficult_question_ids        pre-computed
-   - independent_completion_percentage
-
-5. You MAY augment / refine these with LLM reasoning.
-   You MUST NOT bypass them by querying the DB directly.
-
-DO NOT EDIT below the "--- PLUG-IN POINT ---" comment unless you are
-the ML engineer implementing the Teacher Agent.
+Accepts TeacherAgentRequest (populated deterministically from analytics_service.py)
+and returns TeacherAgentResponse with grounded narrative insights and deterministic analytics.
+No direct SQL queries are executed by the agent.
 """
 from abc import ABC, abstractmethod
-from app.schemas.agent import TeacherAgentRequest, TeacherAgentResponse
-
-
-# ===========================================================================
-# Abstract interface (contract definition — do NOT modify)
-# ===========================================================================
+from app.schemas.agent import TeacherAgentRequest, TeacherAgentResponse, WeakTopic, DifficultQuestion, HighAttentionStudent
 
 class TeacherAgentAdapter(ABC):
-    """
-    Interface the Teacher Agent implementation must satisfy.
-    ML Member 3 sub-classes this and implements `analyze`.
-    """
-
     @abstractmethod
     def analyze(self, request: TeacherAgentRequest) -> TeacherAgentResponse:
-        """
-        Analyze classroom data and return a structured insights response.
-
-        Parameters
-        ----------
-        request : TeacherAgentRequest
-            Pre-populated by the backend service with structured DB data.
-            The agent must NOT run SQL — all needed data is in the request.
-
-        Returns
-        -------
-        TeacherAgentResponse
-            Must include classroom_id.
-            Should populate: weak_topics, weak_subjects, difficult_questions,
-            high_attention_students, independent_completion_percentage,
-            level_3_count, level_4_count, pending_notifications, insights_text.
-        """
         ...
 
-
-# ===========================================================================
-# Default placeholder adapter (used until ML member plugs in)
-# ===========================================================================
-
-class DefaultTeacherAgentAdapter(TeacherAgentAdapter):
+class GroundedTeacherAgentAdapter(TeacherAgentAdapter):
     """
-    *** PLACEHOLDER — for integration testing only ***
-
-    Passes the pre-computed backend data straight through to the response
-    without any LLM reasoning. Produces a placeholder insights_text.
-
-    ML Member 3: replace this class (or swap _teacher_agent below) with
-    your actual implementation that adds narrative reasoning.
+    Real Teacher Agent Adapter:
+    Generates grounded insight narratives strictly supported by deterministic analytics.
     """
 
     def analyze(self, request: TeacherAgentRequest) -> TeacherAgentResponse:
-        from app.schemas.agent import WeakTopic
+        classroom_id = request.classroom_id
+        indep_pct = request.independent_completion_percentage or 100.0
+        level_3_count = len(request.level_3_student_ids or [])
+        level_4_count = len(request.level_4_student_ids or [])
+        weak_topics = request.weak_topics or []
+        weak_subjects = request.weak_subjects or []
+        difficult_q_ids = request.difficult_question_ids or []
 
-        # Pass-through computed metrics from the backend
-        weak_topic_models = [
-            WeakTopic(topic=t, subject=None, affected_students=0)
-            for t in (request.weak_topics or [])
-        ]
-
-        insights_text = (
-            "[PLACEHOLDER — Teacher Agent not yet connected] "
-            f"Classroom {request.classroom_id}: "
-            f"{request.independent_completion_percentage:.1f}% independent completion. "
-            f"Level-3 students: {len(request.level_3_student_ids or [])}. "
-            f"Level-4 students: {len(request.level_4_student_ids or [])}. "
-            f"Weak topics: {', '.join(request.weak_topics or []) or 'none identified'}. "
-            f"When ML Member 3 wires the Teacher Agent, this will contain "
-            f"LLM-generated risk reasoning and actionable recommendations."
+        # Build grounded narrative text strictly using backend statistics
+        narrative_parts = []
+        narrative_parts.append(
+            f"Classroom #{classroom_id} Overview: Independent completion stands at {indep_pct:.1f}%."
         )
 
+        if weak_topics:
+            topics_str = ", ".join(weak_topics[:3])
+            narrative_parts.append(
+                f"Students are currently experiencing difficulty in {len(weak_topics)} topic(s): {topics_str}."
+            )
+        else:
+            narrative_parts.append("No critical weak topics identified for this classroom scope.")
+
+        if difficult_q_ids:
+            narrative_parts.append(
+                f"A total of {len(difficult_q_ids)} question(s) have high struggle rates (>50% student struggle)."
+            )
+
+        if level_4_count > 0 or level_3_count > 0:
+            narrative_parts.append(
+                f"Support Breakdown: {level_4_count} student(s) require high-priority Level 4 teacher support, "
+                f"and {level_3_count} student(s) are engaged in Level 3 practice modules."
+            )
+            narrative_parts.append(
+                "Recommendation: Conduct targeted small-group intervention for Level 4 students before moving to subsequent topics."
+            )
+        else:
+            narrative_parts.append(
+                "All enrolled students are progressing independently at Level 1 or Level 2."
+            )
+
+        insights_text = " ".join(narrative_parts)
+
         return TeacherAgentResponse(
-            classroom_id=request.classroom_id,
-            independent_completion_percentage=request.independent_completion_percentage or 100.0,
-            level_3_count=len(request.level_3_student_ids or []),
-            level_4_count=len(request.level_4_student_ids or []),
-            weak_topics=weak_topic_models,
-            weak_subjects=request.weak_subjects or [],
+            classroom_id=classroom_id,
+            independent_completion_percentage=indep_pct,
+            level_3_count=level_3_count,
+            level_4_count=level_4_count,
+            weak_topics=[WeakTopic(topic=t, subject=None, affected_students=0) for t in weak_topics],
+            weak_subjects=weak_subjects,
             difficult_questions=[],
             high_attention_students=[],
             pending_notifications=[],
             insights_text=insights_text,
         )
 
-
-# ---------------------------------------------------------------------------
-# --- PLUG-IN POINT ---
-# ML Member 3: replace DefaultTeacherAgentAdapter() with your implementation.
-# ---------------------------------------------------------------------------
-_teacher_agent: TeacherAgentAdapter = DefaultTeacherAgentAdapter()
-
+# Set active teacher agent instance
+_teacher_agent: TeacherAgentAdapter = GroundedTeacherAgentAdapter()
 
 def get_teacher_agent() -> TeacherAgentAdapter:
-    """Return the active Teacher Agent adapter. Called by agent_service."""
     return _teacher_agent

@@ -310,11 +310,13 @@ def submit_practice_quiz(
     )
 
     # Update or create progress in DB
-    existing_progress = crud.get_question_progress(
+    existing_progress = crud.get_or_create_question_progress(
         db,
         student_id=current_student.id,
-        assignment_id=request.assignment_id,
         question_id=request.question_id,
+        assignment_id=request.assignment_id,
+        classroom_id=assignment.classroom_id,
+        topic=request.topic,
     )
 
     if existing_progress:

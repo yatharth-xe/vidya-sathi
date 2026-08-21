@@ -30,10 +30,10 @@ const ICONS = {
 
 const TEACHER_NAV = [
   { label: 'Dashboard',       icon: 'dashboard',   path: '/teacher' },
-  { label: 'Classrooms',      icon: 'classrooms',  path: '/teacher' }, // same as dashboard on teacher
-  { label: 'Assignments',     icon: 'assignments', path: null },
-  { label: 'Student Insights',icon: 'insights',    path: null },
-  { label: 'Notifications',   icon: 'notify',      path: null },
+  { label: 'Classrooms',      icon: 'classrooms',  path: '/teacher' },
+  { label: 'Assignments',     icon: 'assignments', path: '/teacher' },
+  { label: 'Student Insights',icon: 'insights',    path: '/teacher/insights' },
+  { label: 'Notifications',   icon: 'notify',      path: '/teacher/notifications' },
 ]
 
 const STUDENT_NAV = [

@@ -13,6 +13,8 @@ import StudentPracticeQuiz from './pages/student/PracticeQuiz'
 import TeacherDashboard from './pages/teacher/Dashboard'
 import TeacherClassroom from './pages/teacher/Classroom'
 import TeacherAssignment from './pages/teacher/Assignment'
+import TeacherNotifications from './pages/teacher/Notifications'
+import TeacherInsights from './pages/teacher/TeacherInsights'
 
 function App() {
   return (
@@ -64,6 +66,21 @@ function App() {
           <Route path="/teacher/classroom/:classId/assignment/:assignId" element={
             <ProtectedRoute allowedRoles={['teacher']}>
               <TeacherAssignment />
+            </ProtectedRoute>
+          } />
+          <Route path="/teacher/assignment/:assignmentId" element={
+            <ProtectedRoute allowedRoles={['teacher']}>
+              <TeacherAssignment />
+            </ProtectedRoute>
+          } />
+          <Route path="/teacher/notifications" element={
+            <ProtectedRoute allowedRoles={['teacher']}>
+              <TeacherNotifications />
+            </ProtectedRoute>
+          } />
+          <Route path="/teacher/insights" element={
+            <ProtectedRoute allowedRoles={['teacher']}>
+              <TeacherInsights />
             </ProtectedRoute>
           } />
 

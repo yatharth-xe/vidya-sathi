@@ -156,92 +156,36 @@ def run_teacher_insights(
     assignment_id: Optional[int] = None,
 ) -> agent_schemas.TeacherAgentResponse:
     """
-    Orchestrate a teacher agent insight request.
-
-    Steps
-    -----
-    1. Load all structured analytics from DB via controlled CRUD.
-    2. Build a typed TeacherAgentRequest with pre-computed metrics.
-    3. Call the adapter (ML Member 3's implementation).
-    4. Return the typed response.
-
-    The adapter receives all needed data and must NOT query the DB.
+    Orchestrate a teacher agent insight request using deterministic analytics_service.
     """
+    from app.services import analytics_service
 
-    # --- 1. Load raw progress data -----------------------------------------
-    progress_records = crud.get_classroom_progress_summary(db, classroom_id)
+    # --- 1. Fetch deterministic analytics from DB -------------------------
+    indep_pct = analytics_service.calculate_independent_completion(
+        db, classroom_id=classroom_id, assignment_id=assignment_id
+    )
+    if indep_pct is None:
+        indep_pct = 100.0
 
-    # Filter to assignment if specified
-    if assignment_id:
-        progress_records = [r for r in progress_records if r.assignment_id == assignment_id]
+    weak_topics_raw = analytics_service.get_weak_topics(
+        db, classroom_id=classroom_id, teacher_id=teacher_id
+    )
+    weak_subjects_raw = analytics_service.get_weak_subjects(
+        db, classroom_id=classroom_id, teacher_id=teacher_id
+    )
+    difficult_questions_raw = analytics_service.get_difficult_questions(
+        db, classroom_id=classroom_id, assignment_id=assignment_id
+    )
+    level_3_students = analytics_service.get_level3_students(
+        db, classroom_id=classroom_id, teacher_id=teacher_id
+    )
+    level_4_students = analytics_service.get_level4_students(
+        db, classroom_id=classroom_id, teacher_id=teacher_id
+    )
 
-    # --- 2. Compute analytics from progress records ------------------------
-    level_counts = {1: 0, 2: 0, 3: 0, 4: 0}
-    topic_level_map: dict = {}      # topic → list of levels seen
-    subject_level_map: dict = {}    # subject → list of levels seen
-    question_level_map: dict = {}   # question_id → list of levels
-
-    level_3_student_ids: list = []
-    level_4_student_ids: list = []
-
-    for r in progress_records:
-        lvl = r.level if r.level in (1, 2, 3, 4) else 1
-        level_counts[lvl] += 1
-
-        if r.topic:
-            topic_level_map.setdefault(r.topic, []).append(lvl)
-        if r.subject:
-            subject_level_map.setdefault(r.subject, []).append(lvl)
-        if r.question_id:
-            question_level_map.setdefault(r.question_id, []).append(lvl)
-
-        if lvl == 3 and r.student_id not in level_3_student_ids:
-            level_3_student_ids.append(r.student_id)
-        if lvl == 4 and r.student_id not in level_4_student_ids:
-            level_4_student_ids.append(r.student_id)
-
-    total = len(progress_records)
-    indep_pct = (level_counts[1] / total * 100.0) if total > 0 else 100.0
-
-    # Weak topics: average level > 1.5
-    weak_topics = [
-        topic for topic, levels in topic_level_map.items()
-        if (sum(levels) / len(levels)) > 1.5
-    ]
-
-    # Weak subjects: average level > 1.5
-    weak_subjects = [
-        subj for subj, levels in subject_level_map.items()
-        if (sum(levels) / len(levels)) > 1.5
-    ]
-
-    # Difficult questions: >50% of students at level 3 or 4
-    difficult_question_ids = [
-        qid for qid, levels in question_level_map.items()
-        if len(levels) > 0 and (sum(1 for l in levels if l >= 3) / len(levels)) > 0.5
-    ]
-
-    # Serialize progress summary rows for the adapter (typed dicts, not ORM objects)
-    progress_summary = [
-        {
-            "student_id": r.student_id,
-            "question_id": r.question_id,
-            "assignment_id": r.assignment_id,
-            "level": r.level,
-            "topic": r.topic,
-            "subject": r.subject,
-            "attention_priority": r.attention_priority,
-            "quiz_score": r.quiz_score,
-            "teacher_intimated": r.teacher_intimated,
-        }
-        for r in progress_records
-    ]
-
-    # --- 3. Load pending notifications ------------------------------------
+    # --- 2. Load pending notifications for this teacher & classroom -------
     raw_notifications = crud.get_unread_notifications(db, teacher_id)
-    # Filter to this classroom
     classroom_notifications = [n for n in raw_notifications if n.classroom_id == classroom_id]
-
     notification_summaries = []
     for n in classroom_notifications:
         student = crud.get_user(db, n.student_id)
@@ -258,24 +202,93 @@ def run_teacher_insights(
             )
         )
 
-    # --- 4. Build request and call adapter --------------------------------
+    # --- 3. Build typed response schemas -----------------------------------
+    weak_topic_models = [
+        agent_schemas.WeakTopic(
+            topic=t["topic"],
+            subject=t["subject"],
+            affected_students=t["affected_students"],
+        )
+        for t in weak_topics_raw
+    ]
+
+    weak_subjects_list = [s["subject"] for s in weak_subjects_raw]
+
+    difficult_q_models = [
+        agent_schemas.DifficultQuestion(
+            question_id=q["question_id"],
+            question_text=f"Question {q['question_number']}: {q['question_text']}",
+            difficulty_percentage=q["struggle_percentage"],
+            students_struggling=q["struggle_count"],
+        )
+        for q in difficult_questions_raw
+    ]
+
+    # Combine Level 3 and Level 4 high attention students
+    high_att_map = {}
+    for s in level_4_students:
+        sid = s["student_id"]
+        high_att_map[sid] = agent_schemas.HighAttentionStudent(
+            student_id=sid,
+            name=s["student_name"],
+            level=4,
+            topics=[s["topic"]] if s.get("topic") else [],
+            attention_priority="high",
+        )
+    for s in level_3_students:
+        sid = s["student_id"]
+        if sid not in high_att_map:
+            high_att_map[sid] = agent_schemas.HighAttentionStudent(
+                student_id=sid,
+                name=s["student_name"],
+                level=3,
+                topics=[s["topic"]] if s.get("topic") else [],
+                attention_priority="normal",
+            )
+    high_att_list = list(high_att_map.values())
+
+    # --- 4. Call Agent Adapter with fallback error handling ----------------
     agent_request = agent_schemas.TeacherAgentRequest(
         teacher_id=teacher_id,
         classroom_id=classroom_id,
         assignment_id=assignment_id,
-        student_progress_summary=progress_summary,
-        weak_topics=weak_topics,
-        weak_subjects=weak_subjects,
-        level_3_student_ids=level_3_student_ids,
-        level_4_student_ids=level_4_student_ids,
-        difficult_question_ids=difficult_question_ids,
-        independent_completion_percentage=round(indep_pct, 1),
+        student_progress_summary=[],
+        weak_topics=[t["topic"] for t in weak_topics_raw],
+        weak_subjects=weak_subjects_list,
+        level_3_student_ids=[s["student_id"] for s in level_3_students],
+        level_4_student_ids=[s["student_id"] for s in level_4_students],
+        difficult_question_ids=[q["question_id"] for q in difficult_questions_raw],
+        independent_completion_percentage=indep_pct,
     )
 
-    adapter = get_teacher_agent()
-    agent_response = adapter.analyze(agent_request)
+    try:
+        adapter = get_teacher_agent()
+        agent_response = adapter.analyze(agent_request)
 
-    # Inject the notifications (backend always controls this — not the adapter)
-    agent_response.pending_notifications = notification_summaries
+        # Enforce backend-derived values for deterministic accuracy
+        agent_response.classroom_id = classroom_id
+        agent_response.independent_completion_percentage = indep_pct
+        agent_response.level_3_count = len(level_3_students)
+        agent_response.level_4_count = len(level_4_students)
+        agent_response.weak_topics = weak_topic_models
+        agent_response.weak_subjects = weak_subjects_list
+        agent_response.difficult_questions = difficult_q_models
+        agent_response.high_attention_students = high_att_list
+        agent_response.pending_notifications = notification_summaries
 
-    return agent_response
+        return agent_response
+    except Exception:
+        # Fallback handling: return deterministic analytics with fallback notice
+        return agent_schemas.TeacherAgentResponse(
+            classroom_id=classroom_id,
+            independent_completion_percentage=indep_pct,
+            level_3_count=len(level_3_students),
+            level_4_count=len(level_4_students),
+            weak_topics=weak_topic_models,
+            weak_subjects=weak_subjects_list,
+            difficult_questions=difficult_q_models,
+            high_attention_students=high_att_list,
+            pending_notifications=notification_summaries,
+            insights_text="AI narrative temporarily unavailable. Review deterministic analytics below.",
+        )
+
