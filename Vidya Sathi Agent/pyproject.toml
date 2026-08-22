@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vidya-sathi-agent"
+version = "1.0.0"
+description = "NCERT Student Learning Agent with Chemistry-gated BM25 / hybrid retrieval."
+readme = "README.md"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = ["agent", "config", "retrieval", "vector_db"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
