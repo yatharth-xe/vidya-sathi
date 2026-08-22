@@ -255,9 +255,12 @@ const DoubtChat = ({ assignmentId, context, onClose }) => {
         ))}
 
         {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', padding: 'var(--sp-3)', alignSelf: 'flex-start' }}>
-            <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} aria-hidden="true" />
-            <span style={{ fontSize: '0.8125rem', color: 'hsl(var(--color-text-3))' }}>AI Tutor is thinking…</span>
+          <div className="vs-typing" role="status">
+            <span aria-hidden="true">🎓</span>
+            <span>Thinking through your question…</span>
+            <span className="vs-typing-dots" aria-hidden="true">
+              <span /><span /><span />
+            </span>
           </div>
         )}
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from langchain.agents import create_agent
@@ -18,7 +18,7 @@ from langchain_ollama import ChatOllama
 
 from agent.citations import format_sources_block
 from agent.prompts import STUDENT_AGENT_SYSTEM_PROMPT
-from agent.tools import STUDENT_AGENT_TOOLS
+from agent.tools import STUDENT_AGENT_TOOLS, set_learning_state_context
 from config.settings import get_settings
 
 
@@ -31,6 +31,9 @@ class StudentAgentRun:
     messages: list[BaseMessage]
     route: str = ""
     sources_block: str = ""
+    # Web sources from scholarship_web_search — kept SEPARATE from NCERT
+    # retrieved_sources so citations never mix textbook and live-web evidence.
+    web_sources: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _load_model(model: str | BaseChatModel | None = None) -> BaseChatModel:
@@ -101,8 +104,16 @@ def run_student_agent(
     *,
     top_k: int | None = None,
     model: str | BaseChatModel | None = None,
+    learning_context: dict[str, Any] | None = None,
 ) -> StudentAgentRun:
-    """Run the Student Agent on one question."""
+    """Run the Student Agent on one question.
+
+    `learning_context` is an optional trusted snapshot of the student's
+    learning state (level, quiz_score, initial_attempt, teacher_intimated,
+    attention_priority) injected by the backend. It is exposed to the agent
+    only through the read-only `student_learning_state` tool — the LLM can
+    never supply identity data itself.
+    """
     settings = get_settings()
     selected_top_k = settings.default_top_k if top_k is None else top_k
 
@@ -112,11 +123,18 @@ def run_student_agent(
         raise ValueError("top_k must be a positive integer")
 
     agent = create_student_agent(model=model)
-    user_content = (
-        f"Student question: {query.strip()}\n"
-        f"If you use ncert_retriever, set top_k={selected_top_k}."
-    )
-    state = agent.invoke({"messages": [{"role": "user", "content": user_content}]})
+
+    # Inject the trusted learning-state snapshot for the read-only
+    # student_learning_state tool. Always cleared afterwards.
+    set_learning_state_context(learning_context)
+    try:
+        user_content = (
+            f"Student question: {query.strip()}\n"
+            f"If you use ncert_retriever, set top_k={selected_top_k}."
+        )
+        state = agent.invoke({"messages": [{"role": "user", "content": user_content}]})
+    finally:
+        set_learning_state_context(None)
     messages = list(state.get("messages", []))
 
     tool_messages = [
@@ -127,6 +145,35 @@ def run_student_agent(
     retrieved_sources: list[dict[str, Any]] = []
     for message in tool_messages:
         retrieved_sources.extend(_source_summary(_parse_tool_payload(message)))
+
+    # Web sources (scholarship_web_search) — tracked separately from NCERT
+    # sources. Only fields actually returned by the tool are preserved;
+    # missing values stay None and are never invented.
+    web_tool_messages = [
+        message
+        for message in messages
+        if isinstance(message, ToolMessage) and message.name == "scholarship_web_search"
+    ]
+    web_sources: list[dict[str, Any]] = []
+    for message in web_tool_messages:
+        payload = _parse_tool_payload(message)
+        for item in payload.get("results", []):
+            if not isinstance(item, dict):
+                continue
+            web_sources.append(
+                {
+                    "rank": item.get("rank"),
+                    "name": item.get("name"),
+                    "provider": item.get("provider"),
+                    "eligibility": item.get("eligibility"),
+                    "benefits": item.get("benefits"),
+                    "deadline": item.get("deadline"),
+                    "application_url": item.get("application_url"),
+                    "source_url": item.get("source_url"),
+                    "official_source": item.get("official_source"),
+                    "last_verified": item.get("last_verified"),
+                }
+            )
 
     final_answer = ""
     for message in reversed(messages):
@@ -151,6 +198,7 @@ def run_student_agent(
         messages=messages,
         route=route,
         sources_block=sources_block,
+        web_sources=web_sources,
     )
 
 

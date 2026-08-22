@@ -130,8 +130,8 @@ def _load_ncert_agent_modules():
         # Append (not prepend) so existing app.* imports always win.
         sys.path.append(root_str)
 
-    from agent.student_agent import run_student_agent
-    from agent.citations import format_source_citation
+    from agent.student_agent import run_student_agent  
+    from agent.citations import format_source_citation 
 
     _agent_module_cache["run_student_agent"] = run_student_agent
     _agent_module_cache["format_source_citation"] = format_source_citation
@@ -169,7 +169,10 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
 
         start = time.perf_counter()
         try:
-            future = self._executor.submit(run_student_agent, query)
+            learning_context = self._build_learning_context(request)
+            future = self._executor.submit(
+                run_student_agent, query, learning_context=learning_context
+            )
             result = future.result(timeout=_AGENT_TIMEOUT_SECONDS)
         except FutureTimeoutError:
             logger.error("NCERT Student Agent timed out after %.0fs", _AGENT_TIMEOUT_SECONDS)
@@ -190,6 +193,8 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
             "retriever_called": bool(getattr(result, "retriever_called", False)),
             "top_k": _TOP_K,
             "latency_seconds": round(elapsed, 2),
+            # Web sources are tracked separately; NCERT citations remain untouched.
+            "web_sources_count": len(getattr(result, "web_sources", None) or []),
         }
 
         return self._safe_response(
@@ -217,6 +222,31 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
         if not parts:
             return request.message.strip()
         return "Context — " + "; ".join(parts) + "\n\nStudent question: " + request.message.strip()
+
+    @staticmethod
+    def _build_learning_context(request: StudentAgentRequest) -> Optional[dict]:
+        """
+        Trusted, read-only learning-state snapshot passed to the NCERT Agent's
+        student_learning_state tool. Built ONLY from backend-owned progress
+        data (request.current_progress). No student_id / identity fields are
+        exposed, and the tool can never write back — level/quiz decisions
+        remain owned by agent_service + quiz_service.
+        """
+        progress = request.current_progress
+        if not progress:
+            return None
+
+        context: dict = {
+            "level": progress.level,
+            "teacher_intimated": bool(progress.teacher_intimated),
+            "attention_priority": progress.attention_priority,
+        }
+        if progress.quiz_score is not None:
+            context["quiz_score"] = progress.quiz_score
+        if progress.initial_attempt is not None:
+            context["initial_attempt"] = progress.initial_attempt
+        # Topic/subject are already part of the question context; not duplicated here.
+        return context
 
     @staticmethod
     def _format_citations(result: Any, format_source_citation) -> Optional[List[str]]:

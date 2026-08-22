@@ -606,6 +606,460 @@ textarea.input-field {
   color: hsl(var(--color-text));
 }
 .stat-label {
+/* ── Student Agent Markdown answer styling (.vs-md) ─────────── */
+/* Renders agent Markdown as a clean educational explanation.   */
+.vs-md {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: hsl(var(--color-text));
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.vs-md > *:first-child { margin-top: 0; }
+.vs-md > *:last-child { margin-bottom: 0; }
+
+/* Paragraphs */
+.vs-md p {
+  margin: 0 0 var(--sp-3);
+}
+
+/* Headings — visually distinct but proportionate inside chat */
+.vs-md h1,
+.vs-md h2,
+.vs-md h3,
+.vs-md h4,
+.vs-md h5,
+.vs-md h6 {
+  font-weight: 700;
+  color: hsl(var(--color-text));
+  margin: var(--sp-4) 0 var(--sp-2);
+  line-height: 1.35;
+}
+.vs-md h1:first-child,
+.vs-md h2:first-child,
+.vs-md h3:first-child { margin-top: 0; }
+.vs-md h1 { font-size: 1.125rem; }
+.vs-md h2 { font-size: 1.03125rem; }
+.vs-md h3 {
+  font-size: 0.9375rem;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid hsl(var(--color-border) / 0.6);
+}
+.vs-md h4 { font-size: 0.875rem; }
+.vs-md h5, .vs-md h6 { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Emphasis */
+.vs-md strong { font-weight: 700; color: hsl(var(--color-text)); }
+.vs-md em { font-style: italic; }
+
+/* Lists — comfortable bullet indentation */
+.vs-md ul,
+.vs-md ol {
+  margin: 0 0 var(--sp-3);
+  padding-left: var(--sp-5);
+}
+.vs-md li {
+  margin-bottom: var(--sp-1);
+  padding-left: var(--sp-1);
+}
+.vs-md li::marker { color: hsl(var(--color-primary)); }
+.vs-md li > ul,
+.vs-md li > ol { margin: var(--sp-1) 0 0; }
+.vs-md li > p { margin-bottom: var(--sp-1); }
+
+/* Inline code */
+.vs-md code {
+  background: hsl(var(--color-surface-3));
+  border: 1px solid hsl(var(--color-border) / 0.6);
+  border-radius: var(--r-sm);
+  padding: 0.08em 0.35em;
+  font-size: 0.8125rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Code blocks — horizontal scroll on narrow screens */
+.vs-md pre {
+  background: hsl(var(--color-surface-3));
+  border: 1px solid hsl(var(--color-border) / 0.6);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0 0 var(--sp-3);
+}
+.vs-md pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+  white-space: pre;
+}
+
+/* Horizontal rule */
+.vs-md hr {
+  border: none;
+  border-top: 1px solid hsl(var(--color-border));
+  margin: var(--sp-4) 0;
+}
+
+/* Blockquote */
+.vs-md blockquote {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid hsl(var(--color-primary));
+  background: hsl(var(--color-surface-3));
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: hsl(var(--color-text-2));
+}
+
+/* Links */
+.vs-md a {
+  color: hsl(var(--color-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+/* Tables — wrapped so wide tables scroll horizontally on mobile */
+.vs-md-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid hsl(var(--color-border));
+}
+.vs-md table {
+  width: 100%;
+  min-width: 320px;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.vs-md thead th {
+  background: hsl(var(--color-surface-3));
+  text-align: left;
+  font-weight: 700;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid hsl(var(--color-border));
+  white-space: nowrap;
+}
+.vs-md tbody td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid hsl(var(--color-border) / 0.6);
+  vertical-align: top;
+}
+.vs-md tbody tr:last-child td { border-bottom: none; }
+.vs-md tbody tr:nth-child(even) td { background: hsl(var(--color-surface-3) / 0.45); }
+
+/* Sources list in ChatMessage */
+.vs-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+/* ── KaTeX math styling in Student Agent answers ────────────── */
+/* Readable on dark surfaces; wide equations scroll, never the page. */
+.vs-md .katex {
+  font-size: 1.05em;
+  color: hsl(var(--color-text));
+}
+
+/* Inline math gets slight breathing room */
+.vs-md .katex-inline,
+.vs-md span.katex { padding: 0 0.05em; }
+
+/* Display equations — visually distinct block with safe scrolling */
+.vs-md .katex-display {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: hsl(var(--color-surface-3) / 0.5);
+  border: 1px solid hsl(var(--color-border) / 0.5);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.vs-md .katex-display > .katex {
+  white-space: nowrap;
+}
+
+/* Tables containing math — keep cells compact but scrollable */
+/* ── Tutor chat message redesign ────────────────────────────── */
+
+/* Assistant bubble — calm educational surface, comfortable column */
+.vs-tutor-msg {
+  max-width: min(85%, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  border-top-left-radius: var(--r-sm);
+  background: hsl(var(--color-surface-2));
+  border: 1px solid hsl(var(--color-border));
+}
+
+/* Tutor header */
+.vs-tutor-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid hsl(var(--color-border) / 0.6);
+}
+.vs-tutor-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  background: hsl(var(--color-primary) / 0.15);
+}
+.vs-tutor-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: hsl(var(--color-text));
+}
+.vs-tutor-header-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+.vs-level-badge, .vs-context-badge { font-size: 0.6875rem; }
+
+/* User bubble — compact, distinct */
+.vs-user-msg {
+  max-width: 85%;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-lg);
+  border-bottom-right-radius: var(--r-sm);
+  background: hsl(var(--color-primary));
+  color: #fff;
+  font-size: 0.9375rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Timestamp row */
+.vs-msg-meta {
+  font-size: 0.6875rem;
+  color: hsl(var(--color-text-3));
+  margin-top: var(--sp-1);
+  padding: 0 var(--sp-1);
+}
+
+/* ── Answer typography (comfortable reading) ────────────────── */
+.vs-md { font-size: 0.9375rem; line-height: 1.65; }
+
+/* Headings — typographic hierarchy, no heavy borders */
+.vs-md h1 { font-size: 1.1875rem; letter-spacing: -0.01em; }
+.vs-md h2 { font-size: 1.0625rem; margin-top: var(--sp-5); }
+.vs-md h3 { font-size: 0.96875rem; border-bottom: none; opacity: 0.95; }
+.vs-md p { margin: 0 0 var(--sp-3); }
+
+/* Numbered steps — instructional step look via CSS counters */
+.vs-md ul { padding-left: var(--sp-4); }
+.vs-md > ol {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: vs-step;
+}
+.vs-md > ol > li {
+  counter-increment: vs-step;
+  position: relative;
+  padding-left: 2.4em;
+  margin-bottom: var(--sp-3);
+}
+.vs-md > ol > li::before {
+  content: counter(vs-step);
+  position: absolute;
+  left: 0;
+  top: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: hsl(var(--color-primary));
+  background: hsl(var(--color-primary) / 0.14);
+}
+.vs-md ol li > p { margin-bottom: var(--sp-1); }
+
+/* Nested / plain bullets keep classic markers */
+.vs-md ul li { margin-bottom: var(--sp-2); }
+.vs-md ol ul { list-style: disc; padding-left: var(--sp-4); }
+.vs-md ol ul li { padding-left: 0; margin-bottom: var(--sp-1); }
+.vs-md ol ul li::before { content: none; }
+
+/* Inline citation chips — de-emphasized pills */
+.vs-cite {
+  display: inline-block;
+  font-size: 0.65625rem;
+  line-height: 1.4;
+  color: hsl(var(--color-text-3));
+  background: hsl(var(--color-surface-3) / 0.7);
+  border-radius: 999px;
+  padding: 0.05em 0.5em;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Tables & equations polish */
+.vs-md thead th { font-size: 0.78125rem; letter-spacing: 0.01em; }
+.vs-md tbody td { font-size: 0.84375rem; }
+
+/* Hints */
+.vs-hints {
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: hsl(var(--color-surface-3, var(--color-surface)));
+  border: 1px solid hsl(var(--color-border));
+}
+.vs-hints-title {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--color-primary-fg));
+}
+.vs-hints ul {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-size: 0.8125rem;
+  color: hsl(var(--color-text-2));
+}
+.vs-hints li { margin-bottom: 2px; }
+
+/* Teacher notice & practice CTA spacing */
+.vs-teacher-note { font-size: 0.75rem; border-radius: var(--r-md); }
+.vs-practice-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--sp-1); }
+
+/* ── Sources panel — compact, collapsible, secondary ────────── */
+.vs-sources-panel {
+  border-top: 1px solid hsl(var(--color-border) / 0.6);
+  padding-top: var(--sp-2);
+  font-size: 0.75rem;
+}
+.vs-sources-panel summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  user-select: none;
+}
+.vs-sources-panel summary::-webkit-details-marker { display: none; }
+.vs-sources-panel summary:focus-visible {
+  outline: 2px solid hsl(var(--color-primary) / 0.6);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+.vs-sources-title { font-weight: 600; color: hsl(var(--color-text-2)); }
+.vs-sources-count {
+  color: hsl(var(--color-text-3));
+  font-size: 0.6875rem;
+  background: hsl(var(--color-surface-3) / 0.7);
+  border-radius: 999px;
+  padding: 0.1em 0.55em;
+}
+.vs-source-rows {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.vs-source-row { display: flex; align-items: flex-start; gap: var(--sp-2); }
+.vs-source-chip {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: hsl(var(--color-primary));
+  background: hsl(var(--color-primary) / 0.12);
+  border-radius: var(--r-sm);
+  padding: 0.15em 0.45em;
+  margin-top: 0.1em;
+}
+.vs-source-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
+.vs-source-meta strong { color: hsl(var(--color-text-2)); font-weight: 600; }
+.vs-source-meta small { color: hsl(var(--color-text-3)); overflow-wrap: anywhere; }
+
+/* ── Tutor "thinking" indicator ─────────────────────────────── */
+.vs-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  border-top-left-radius: var(--r-sm);
+  background: hsl(var(--color-surface-2));
+  border: 1px solid hsl(var(--color-border));
+  font-size: 0.8125rem;
+  color: hsl(var(--color-text-2));
+}
+.vs-typing-dots { display: inline-flex; gap: 3px; }
+.vs-typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: hsl(var(--color-text-3));
+  animation: vs-dot-pulse 1.2s infinite ease-in-out;
+}
+.vs-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.vs-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes vs-dot-pulse {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-typing-dots span { animation: none; }
+}
+
+/* Mobile — reduce paddings, keep readable hierarchy */
+@media (max-width: 640px) {
+  .vs-tutor-msg { max-width: 100%; padding: var(--sp-3); }
+  .vs-user-msg { max-width: 90%; }
+  .vs-md { font-size: 0.90625rem; }
+  .vs-md h1 { font-size: 1.125rem; }
+  .vs-md h2 { font-size: 1rem; }
+  .vs-tutor-header-end { margin-left: 0; width: 100%; }
+}
+.vs-md tbody tr:nth-child(even) td { background: transparent; }
+.vs-md .katex-display { background: none; border: none; padding: var(--sp-1) 0; margin: var(--sp-3) 0; }
+.vs-md .katex-display > .katex { font-size: 1.1em; }
+.vs-md td .katex-display,
+.vs-md th .katex-display {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+}
+.vs-sources li {
+  position: relative;
+  padding-left: 0.9em;
+  margin-bottom: 0.25em;
+  line-height: 1.55;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.vs-sources li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: hsl(var(--color-primary));
+}
   font-size: 0.8125rem;
   color: hsl(var(--color-text-3));
   font-weight: 500;

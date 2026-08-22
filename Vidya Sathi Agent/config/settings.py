@@ -42,6 +42,10 @@ DEFAULT_TOP_K = 10
 DEFAULT_AGENT_MODEL = "gpt-oss:120b-cloud"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
+# Scholarship web search (thin stdlib HTTP client — no extra dependencies).
+DEFAULT_SCHOLARSHIP_TIMEOUT_SECONDS = 10
+DEFAULT_SCHOLARSHIP_MAX_RESULTS = 5
+
 
 def _env_path(name: str, default: Path) -> Path:
     raw = os.getenv(name)
@@ -77,11 +81,19 @@ class Settings:
     ollama_model: str
     ollama_base_url: str
     benchmark_queries_path: Path
+    scholarship_search_timeout: float
+    scholarship_max_results: int
 
     @property
     def ollama_api_key(self) -> str | None:
         """Return the API key from the environment without storing it here."""
         key = os.getenv("OLLAMA_API_KEY", "").strip()
+        return key or None
+
+    @property
+    def scholarship_api_key(self) -> str | None:
+        """Optional Tavily API key for scholarship web search (server-side only)."""
+        key = os.getenv("TAVILY_API_KEY", "").strip()
         return key or None
 
 
@@ -122,4 +134,14 @@ def get_settings() -> Settings:
             os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_BASE_URL),
         ),
         benchmark_queries_path=DEFAULT_BENCHMARK_QUERIES,
+        scholarship_search_timeout=float(
+            os.getenv(
+                "SCHOLARSHIP_SEARCH_TIMEOUT",
+                DEFAULT_SCHOLARSHIP_TIMEOUT_SECONDS,
+            )
+        ),
+        scholarship_max_results=_env_int(
+            "SCHOLARSHIP_MAX_RESULTS",
+            DEFAULT_SCHOLARSHIP_MAX_RESULTS,
+        ),
     )

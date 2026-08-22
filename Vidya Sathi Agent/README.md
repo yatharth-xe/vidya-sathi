@@ -149,3 +149,55 @@ Excluded on purpose:
 - Intermediate benchmark JSON/Markdown reports
 
 Keep `Knowledge_Base` as the archive. Do not import it from this project.
+
+---
+
+# HANDOFF — 3-Tool Student Agent (Phase 6)
+
+> Note: the diagram above predates Phase 2. The agent now has exactly THREE tools:
+
+## Tools (exactly three — do not add more without re-running the full test suite)
+1. `ncert_retriever(query, top_k)` — Chemistry-gated BM25/BGE/Chroma/RRF NCERT retrieval.
+2. `student_learning_state()` — READ-ONLY snapshot of backend-injected progress (level, quiz score, teacher-support status). Takes NO arguments; identity comes only from the backend.
+3. `scholarship_web_search(query)` — live web search for scholarships; official sources boosted, URLs validated (http/s only), text sanitized and size-capped, results hard-capped at 10, short timeout, fails safe.
+
+Registered in `agent/tools.py::STUDENT_AGENT_TOOLS`; entry point `agent/student_agent.py::run_student_agent(query, top_k=None, model=None, learning_context=None)`.
+
+## Backend integration
+`POST /api/v1/agents/student/chat` ? `agent_service.run_student_chat` ? `NCERTStudentAgentAdapter` (`backend/app/services/student_agent_adapter.py`) ? `run_student_agent`. The adapter injects trusted `learning_context` from `StudentAgentRequest.current_progress` and clears it in a `finally` block. The agent NEVER touches SQLAlchemy/CRUD; level/quiz policy is owned by `quiz_service.py` + `agent_service.py`.
+
+## Environment variables (.env, never committed)
+| Variable | Purpose |
+|---|---|
+| `OLLAMA_API_KEY` | Ollama Cloud auth (required for live runs) |
+| `OLLAMA_BASE_URL` | `https://ollama.com` (cloud) or local daemon |
+| `VIDYA_SATHI_MODEL` | e.g. `gpt-oss:120b-cloud` |
+| `TAVILY_API_KEY` | optional; scholarship search provider (keyless DuckDuckGo fallback exists) |
+| `SCHOLARSHIP_SEARCH_TIMEOUT`, `SCHOLARSHIP_MAX_RESULTS` | optional knobs (hard cap 10) |
+
+## Required runtime artifacts
+- `data/knowledge_chunks_final.jsonl` (2587 chunks)
+- `data/chroma_db/` (persistent Chroma store)
+- `data/model_cache/` (BGE `bge-small-en-v1.5` cache)
+- `.env` with at least `OLLAMA_*` values
+
+## Tests & startup
+```powershell
+# Agent unit/integration tests (offline, deterministic)
+python -m pytest "tests/test_student_agent.py" -q
+# Full E2E through the real FastAPI app (isolated temp SQLite; LLM stubbed)
+python -m pytest ..\backend\tests\test_e2e_student_agent.py -q
+# Opt-in live tests (real Ollama Cloud / web search)
+$env:RUN_LIVE_AGENT_TESTS="1"
+# Backend
+uvicorn app.main:app --reload --app-dir backend   # from repo root
+# Frontend
+cd frontend; npm run build
+```
+E2E NEVER touches `backend/vidya_sathi.db` (guarded in `conftest.py`).
+
+## Known risks / behaviors
+- Corpus is Class 11/12 CHEMISTRY-only: non-chemistry academic questions route via the gate and may be answered from assignment context without textbook citations — by design; no fabricated citations are emitted.
+- Web results are untrusted data (prompt-enforced + sanitized); eligibility/deadlines must be verified on official pages.
+- Scholarship fallback uses DuckDuckGo HTML scraping — markup changes degrade to empty results (fail-safe); set `TAVILY_API_KEY` for the robust path.
+- Learning-state context holder assumes serialized agent runs (adapter uses a single-worker executor).

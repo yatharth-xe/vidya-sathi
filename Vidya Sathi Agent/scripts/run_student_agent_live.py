@@ -16,8 +16,12 @@ from agent.tools import STUDENT_AGENT_TOOLS
 def main() -> int:
     names = [tool.name for tool in STUDENT_AGENT_TOOLS]
     print(f"Agent tools: {names}")
-    if names != ["ncert_retriever"]:
-        print("ERROR: expected exactly one tool named ncert_retriever")
+    expected = ["ncert_retriever", "student_learning_state", "scholarship_web_search"]
+    if names != expected:
+        print(
+            "ERROR: expected exactly three tools: "
+            "ncert_retriever, student_learning_state, scholarship_web_search"
+        )
         return 1
 
     result = run_student_agent(
