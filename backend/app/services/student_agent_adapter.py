@@ -188,6 +188,18 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
 
         # --- 4. Map to the Vidya Sathi contract --------------------------
         citations = self._format_citations(result, format_source_citation)
+        # Detect whether the agent invoked the learning-state tool at all
+        # (any attempt, including a rejected one). Drives the Phase 10
+        # backend fallback decision.
+        _learning_state_tool_called = False
+        from langchain_core.messages import ToolMessage as _TM  # noqa: N813
+
+        for _message in getattr(result, "messages", None) or []:
+            if isinstance(_message, _TM) and \
+                    _message.name == "student_learning_state":
+                _learning_state_tool_called = True
+                break
+
         metadata = {
             "route": getattr(result, "route", "") or None,
             "retriever_called": bool(getattr(result, "retriever_called", False)),
@@ -195,6 +207,8 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
             "latency_seconds": round(elapsed, 2),
             # Web sources are tracked separately; NCERT citations remain untouched.
             "web_sources_count": len(getattr(result, "web_sources", None) or []),
+            # Phase 10 orchestration signal (internal metadata only).
+            "learning_state_tool_called": _learning_state_tool_called,
         }
 
         return self._safe_response(
@@ -226,27 +240,38 @@ class NCERTStudentAgentAdapter(StudentAgentAdapter):
     @staticmethod
     def _build_learning_context(request: StudentAgentRequest) -> Optional[dict]:
         """
-        Trusted, read-only learning-state snapshot passed to the NCERT Agent's
-        student_learning_state tool. Built ONLY from backend-owned progress
-        data (request.current_progress). No student_id / identity fields are
-        exposed, and the tool can never write back — level/quiz decisions
-        remain owned by agent_service + quiz_service.
+        Trusted per-run payload passed to the NCERT Agent's
+        student_learning_state tool. Two parts:
+
+        - ``snapshot``: read-only progress fields for conversational context.
+        - ``scope``:   authorized WRITE scope. ``student_id`` comes ONLY from
+          the authenticated backend request — never from the client or LLM.
+          The tool may persist level/topic within this scope only, and the
+          service re-validates enrollment/ownership plus quiz authority.
         """
         progress = request.current_progress
-        if not progress:
-            return None
+        snapshot: dict = {}
+        if progress:
+            snapshot = {
+                "level": progress.level,
+                "teacher_intimated": bool(progress.teacher_intimated),
+                "attention_priority": progress.attention_priority,
+            }
+            if progress.quiz_score is not None:
+                snapshot["quiz_score"] = progress.quiz_score
+            if progress.initial_attempt is not None:
+                snapshot["initial_attempt"] = progress.initial_attempt
 
-        context: dict = {
-            "level": progress.level,
-            "teacher_intimated": bool(progress.teacher_intimated),
-            "attention_priority": progress.attention_priority,
+        scope: dict = {
+            "student_id": request.student_id,
+            "classroom_id": request.classroom_id,
+            "assignment_id": request.assignment_id,
+            "question_id": request.question_id,
         }
-        if progress.quiz_score is not None:
-            context["quiz_score"] = progress.quiz_score
-        if progress.initial_attempt is not None:
-            context["initial_attempt"] = progress.initial_attempt
-        # Topic/subject are already part of the question context; not duplicated here.
-        return context
+        if request.question_context:
+            scope["subject"] = request.question_context.subject
+
+        return {"snapshot": snapshot, "scope": scope}
 
     @staticmethod
     def _format_citations(result: Any, format_source_citation) -> Optional[List[str]]:

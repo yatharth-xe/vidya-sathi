@@ -1,23 +1,82 @@
-# Node/Frontend dependency and build dirs
+# ──────────────────────────────────────────────────────
+# Python — applies to ALL directories in the tree
+# ──────────────────────────────────────────────────────
+# Python bytecode caches (catches every __pycache__ everywhere)
+**/__pycache__/
+*/__pycache__/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Test / type-checker caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+pytest_cache/
+
+# Virtual environments — catch venvs anywhere (root, backend, frontend, agent)
+.venv/
+venv/
+env/
+.venv.bak/
+venv.bak/
+ENV/
+env.bak/
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+develop-eggs/
+wheels/
+
+# ──────────────────────────────────────────────────────
+# Node / frontend
+# ──────────────────────────────────────────────────────
+# Dependencies & builds (catch everywhere)
+node_modules/
 frontend/node_modules/
+backend/node_modules/
 frontend/dist/
+frontend/build/
+.next/
+.nuxt/
+
+# npm / yarn caches
+.npm/
+.pnpm-store/
+.yarn/
+yarn-offline-cache/
+
+# Logs
+*.log
+logs/
+
+# ──────────────────────────────────────────────────────
+# Environment / secrets
+# ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+.envrc
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 
-# Python/Backend dependency and build dirs
-backend/__pycache__/
-backend/*.py[cod]
-backend/*$py.class
-backend/.venv/
-backend/venv/
-backend/ENV/
-backend/env/
-backend/uploads/*
-!backend/uploads/.gitkeep
-backend/app/__pycache__/
-
+# ──────────────────────────────────────────────────────
 # IDEs and local configurations
+# ──────────────────────────────────────────────────────
 .idea/
 .vscode/
 *.suo
@@ -25,7 +84,20 @@ backend/app/__pycache__/
 *.njsproj
 *.sln
 *.sw?
+# OS files
 .DS_Store
-.env
-.env.local
-*.log
+Thumbs.db
+
+# ──────────────────────────────────────────────────────
+# Application-specific
+# ──────────────────────────────────────────────────────
+# Local upload directories (ignored but keep .gitkeep)
+**/uploads/*
+!**.gitkeep
+
+# Agent model cache (large offline binaries)
+Vidya Sathi Agent/data/model_cache/
+
+# SQLite databases (local runtime only)
+*.db
+*.db-journal

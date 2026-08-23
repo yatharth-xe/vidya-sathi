@@ -16,10 +16,14 @@ CRITICAL: This service is the only place that touches the DB on behalf of agents
 from typing import Optional
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.database import crud, models
 from app.schemas import agent as agent_schemas
 from app.services.student_agent_adapter import get_student_agent
 from app.services.teacher_agent_adapter import get_teacher_agent
+
+logger = logging.getLogger("uvicorn.error")
 
 
 # ===========================================================================
@@ -118,6 +122,43 @@ def run_student_chat(
             attention_priority=agent_response.attention_priority,
             teacher_intimated=agent_response.teacher_intimated,
         )
+
+    # --- 5b. Reliability safeguard (Phase 10) -----------------------------
+    # Guarantee every applicable doubt exchange produces exactly ONE
+    # conversational learning-state persistence. If the agent did not invoke
+    # the tool, the backend performs one controlled upsert through the SAME
+    # service, preserving the current level (never fabricating Level 1) and
+    # letting the quiz-authority guard reject if applicable.
+    metadata = agent_response.metadata or {}
+    tool_called = bool(metadata.get("learning_state_tool_called"))
+    _conversational_assessment_source = "agent_tool" if tool_called else None
+    if (not tool_called) and question_id and progress_ctx:
+        try:
+            from app.services.learning_state_service import (
+                upsert_student_learning_state)
+
+            fallback_result = upsert_student_learning_state(
+                db,
+                student_id=student_id,
+                classroom_id=classroom_id,
+                assignment_id=assignment_id,
+                question_id=question_id,
+                level=progress_ctx.level,   # preserve — no fabricated L1
+                topic=progress_ctx.topic,
+                trusted_subject=progress_ctx.subject,
+            )
+            _conversational_assessment_source = "backend_fallback"
+            logging.getLogger("uvicorn.error").info(
+                "learning_state_assessment_source=backend_fallback "
+                "result=%s", fallback_result.get("status"))
+        except Exception:  # never break the chat on a fallback issue
+            logger.exception("learning-state fallback failed; continuing")
+
+    # Record internal observability (dropped by the HTTP contract mapping).
+    agent_meta = dict(agent_response.metadata or {})
+    agent_meta["learning_state_assessment_source"] = \
+        _conversational_assessment_source or "agent_tool"
+    agent_response.metadata = agent_meta
 
     if agent_response.teacher_intimated and progress_ctx:
         # Find the classroom's teacher to send notification to
@@ -262,6 +303,9 @@ def run_teacher_insights(
     )
 
     try:
+        from app.services.teacher_agent_tools import set_teacher_scope
+
+        set_teacher_scope({"teacher_id": teacher_id})
         adapter = get_teacher_agent()
         agent_response = adapter.analyze(agent_request)
 
@@ -276,9 +320,16 @@ def run_teacher_insights(
         agent_response.high_attention_students = high_att_list
         agent_response.pending_notifications = notification_summaries
 
+        set_teacher_scope(None)  # clear trusted scope after the run
         return agent_response
     except Exception:
         # Fallback handling: return deterministic analytics with fallback notice
+        try:
+            from app.services.teacher_agent_tools import set_teacher_scope
+
+            set_teacher_scope(None)
+        except ImportError:
+            pass
         return agent_schemas.TeacherAgentResponse(
             classroom_id=classroom_id,
             independent_completion_percentage=indep_pct,
