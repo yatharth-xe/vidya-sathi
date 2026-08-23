@@ -121,47 +121,136 @@ class StudentAgentTest(unittest.TestCase):
             ["ncert_retriever", "student_learning_state", "scholarship_web_search"],
         )
 
-    def test_learning_state_tool_takes_no_llm_arguments(self) -> None:
-        # The tool must accept no arguments so the LLM can never pass
-        # identity data such as student_id.
-        self.assertEqual(student_learning_state.args_schema.model_fields, {})
+    # ------------------------------------------------------------------
+    # student_learning_state — controlled WRITE tool (two-track model)
+    # ------------------------------------------------------------------
+    SCOPE = {
+        "student_id": 42,
+        "classroom_id": 7,
+        "assignment_id": 11,
+        "question_id": 13,
+        "subject": "Chemistry",
+    }
+    ARGS = {
+        "classroom_id": 7,
+        "assignment_id": 11,
+        "question_id": 13,
+        "level": 2,
+        "topic": "Chemical Bonding",
+    }
 
-    def test_learning_state_without_context_reports_unavailable(self) -> None:
+    def test_learning_state_schema_has_no_student_id(self) -> None:
+        # The LLM must never be able to pass student_id.
+        fields = student_learning_state.args_schema.model_fields
+        self.assertNotIn("student_id", fields)
+        self.assertEqual(
+            set(fields),
+            {"classroom_id", "assignment_id", "question_id", "level",
+             "topic", "evidence"},
+        )
+
+    def test_learning_state_level1_requires_evidence(self) -> None:
+        set_learning_state_context({"snapshot": {}, "scope": dict(self.SCOPE)})
+        try:
+            payload = student_learning_state.invoke(
+                {**self.ARGS, "level": 1, "evidence": ""})
+        finally:
+            set_learning_state_context(None)
+        self.assertEqual(payload["status"], "rejected")
+        self.assertEqual(payload["reason"],
+                         "insufficient_evidence_for_level_1")
+
+    def test_learning_state_level1_with_evidence_is_forwarded(self) -> None:
+        backend_dir = Path(__file__).resolve().parents[2] / "backend"
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+
+        with mock.patch(
+            "app.services.learning_state_service.upsert_student_learning_state",
+            lambda **kw: {"status": "updated", "level": 1},
+        ):
+            set_learning_state_context(
+                {"snapshot": {}, "scope": dict(self.SCOPE)})
+            try:
+                payload = student_learning_state.invoke({
+                    **self.ARGS, "level": 1,
+                    "evidence": "Student correctly restated octet sharing."})
+            finally:
+                set_learning_state_context(None)
+        self.assertEqual(payload["status"], "updated")
+        self.assertIn("evidence", payload)
+
+    def test_learning_state_rejects_without_scope(self) -> None:
         set_learning_state_context(None)
         try:
-            payload = student_learning_state.invoke({})
+            payload = student_learning_state.invoke(dict(self.ARGS))
         finally:
             set_learning_state_context(None)
-        self.assertFalse(payload["available"])
-        self.assertIn("No learning-state snapshot", payload["summary"])
+        self.assertEqual(payload["status"], "rejected")
+        self.assertEqual(payload["reason"], "no_authorized_scope")
 
-    def test_learning_state_with_trusted_context(self) -> None:
-        set_learning_state_context(
-            {
-                "level": 4,
-                "quiz_score": 40.0,
-                "initial_attempt": "tried twice",
-                "teacher_intimated": True,
-                "attention_priority": "high",
-            }
-        )
+    def test_learning_state_rejects_out_of_scope_ids(self) -> None:
+        set_learning_state_context({"snapshot": {}, "scope": dict(self.SCOPE)})
         try:
-            payload = student_learning_state.invoke({})
+            payload = student_learning_state.invoke(
+                {**self.ARGS, "classroom_id": 999})
         finally:
             set_learning_state_context(None)
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["level"], 4)
-        self.assertEqual(payload["quiz_score"], 40.0)
-        self.assertTrue(payload["teacher_support_active"])
-        self.assertEqual(payload["attention_priority"], "high")
-        self.assertIn("teacher support recommended", payload["summary"])
+        self.assertEqual(payload["status"], "rejected")
+        self.assertEqual(payload["reason"], "classroom_id_outside_authorized_scope")
+
+    def test_learning_state_passes_authenticated_identity_to_service(self) -> None:
+        captured = {}
+        backend_dir = Path(__file__).resolve().parents[2] / "backend"
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+
+        def fake_upsert(**kwargs):
+            captured.update(kwargs)
+            return {"status": "updated", "record_id": 1, "level": kwargs["level"]}
+
+        set_learning_state_context({"snapshot": {}, "scope": dict(self.SCOPE)})
+        try:
+            with mock.patch(
+                "app.services.learning_state_service.upsert_student_learning_state",
+                fake_upsert,
+            ):
+                payload = student_learning_state.invoke(dict(self.ARGS))
+        finally:
+            set_learning_state_context(None)
+        self.assertEqual(payload["status"], "updated")
+        # Identity injected from the trusted scope — never an LLM argument.
+        self.assertEqual(captured["student_id"], 42)
+        self.assertEqual(captured["trusted_subject"], "Chemistry")
+        self.assertEqual(captured["level"], 2)
+
+    def test_learning_state_service_unavailable_fails_safe(self) -> None:
+        import builtins
+
+        backend_dir = Path(__file__).resolve().parents[2] / "backend"
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+        real_import = builtins.__import__
+
+        def blocked(name, *args, **kwargs):
+            if name.startswith("app.services.learning_state_service"):
+                raise ImportError("standalone mode")
+            return real_import(name, *args, **kwargs)
+
+        set_learning_state_context({"snapshot": {}, "scope": dict(self.SCOPE)})
+        try:
+            with mock.patch("builtins.__import__", side_effect=blocked):
+                payload = student_learning_state.invoke(dict(self.ARGS))
+        finally:
+            set_learning_state_context(None)
+        self.assertEqual(payload["status"], "unavailable")
 
     def test_learning_state_context_is_cleared_after_run(self) -> None:
         run_student_agent(
             "Explain chemical bonding.",
             top_k=1,
             model=ScriptedRetrieverModel(),
-            learning_context={"level": 2},
+            learning_context={"snapshot": {}, "scope": dict(self.SCOPE)},
         )
         self.assertIsNone(get_learning_state_context())
 
@@ -303,7 +392,13 @@ class StudentAgentTest(unittest.TestCase):
         result = run_student_agent(
             "What is my current level and progress?",
             model=ScriptedToolCallModel(
-                tool_name="student_learning_state", tool_args={}
+                tool_name="student_learning_state",
+                tool_args={
+                    "classroom_id": 7,
+                    "assignment_id": 11,
+                    "question_id": 13,
+                    "level": 2,
+                },
             ),
             learning_context={"level": 3, "quiz_score": None},
         )

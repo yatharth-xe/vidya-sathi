@@ -31,84 +31,166 @@ def ncert_retriever(query: str, top_k: int = 10) -> dict[str, Any]:
 
 
 # ===========================================================================
-# student_learning_state — READ-ONLY trusted context tool
+# student_learning_state — CONTROLLED WRITE tool (two-track model, Track 1)
 # ===========================================================================
-# The learning state is injected by the BACKEND before each agent run via
-# set_learning_state_context(). The LLM can never supply a student_id or any
-# identity field: the tool takes NO arguments at all. It only formats and
-# summarizes the trusted progress snapshot the backend provided. If no
-# context was injected, it reports that plainly.
+# The Student Agent assesses the CONVERSATION and persists a conversational
+# level (1-4) for the AUTHENTICATED student. Identity never comes from the
+# LLM: the backend injects a trusted WRITE SCOPE (student_id, classroom_id,
+# assignment_id, question_id, subject) before each run and clears it after.
 #
-# This tool NEVER writes anything and has no database access.
+# The LLM supplies only: classroom_id, assignment_id, question_id, level,
+# topic — and they must match the injected scope.
+#
+# QUIZ AUTHORITY GUARD: rows with a quiz-determined state (quiz_score set by
+# the backend quiz flow) can NEVER be overwritten here; the service returns
+# {"status": "rejected", "reason": "quiz_authoritative_state"}.
+#
+# The tool NEVER writes quiz_score / teacher_intimated / attention_priority /
+# initial_attempt and NEVER creates teacher notifications. All writes go
+# through app.services.learning_state_service -> CRUD -> SQLite.
 
 _LEARNING_STATE_CONTEXT: dict[str, Any] | None = None
+# Per-run write guard (Phase 10): prevents the LLM from writing the
+# learning state more than once in a single agent run.
+_LEARNING_STATE_WRITES: int = 0
+_STATE_WRITE_LOCK: Any = __import__("threading").Lock()
 
 
 def set_learning_state_context(context: dict[str, Any] | None) -> None:
-    """Inject the backend-provided (trusted) learning state snapshot for the
-    current run. Pass None to clear it. Runs are serialized by the adapter's
-    single-worker executor, so a module-level holder is safe."""
-    global _LEARNING_STATE_CONTEXT
-    _LEARNING_STATE_CONTEXT = context
+    """Inject the trusted per-run learning-state payload from the backend.
+
+    Accepted shapes:
+      - {"snapshot": {...}, "scope": {...}}  (current)
+      - a flat snapshot dict (legacy read-only callers) -> scope = None
+    Pass None to clear. Runs are serialized by the adapter's single-worker
+    executor, so a module-level holder is safe.
+    """
+    global _LEARNING_STATE_CONTEXT, _LEARNING_STATE_WRITES
+    _LEARNING_STATE_WRITES = 0  # reset per-run write guard
+    if context is None:
+        _LEARNING_STATE_CONTEXT = None
+    elif "scope" in context or "snapshot" in context:
+        _LEARNING_STATE_CONTEXT = {
+            "snapshot": context.get("snapshot") or {},
+            "scope": context.get("scope"),
+        }
+    else:
+        _LEARNING_STATE_CONTEXT = {"snapshot": dict(context), "scope": None}
+
+
+def _learning_state_writes() -> int:
+    return _LEARNING_STATE_WRITES
 
 
 def get_learning_state_context() -> dict[str, Any] | None:
-    """Return the currently injected learning-state snapshot (or None)."""
+    """Return the currently injected learning-state payload (or None)."""
     return _LEARNING_STATE_CONTEXT
 
 
-def _learning_state_summary(state: dict[str, Any]) -> str:
-    level = state.get("level")
-    quiz_score = state.get("quiz_score")
+def _learning_state_scope() -> dict[str, Any] | None:
+    """Return the injected trusted write scope (or None)."""
+    ctx = _LEARNING_STATE_CONTEXT or {}
+    return ctx.get("scope")
 
-    parts: list[str] = []
-    if level == 1:
-        parts.append("learning independently")
-    elif level == 2:
-        parts.append("needs guided hints")
-    elif level == 3:
-        parts.append("ready for a practice quiz")
-    elif level == 4:
-        parts.append("teacher support recommended")
-    else:
-        parts.append(f"at level {level}")
-
-    if quiz_score is not None:
-        parts.append(f"last practice-quiz score {quiz_score}%")
-
-    return "The student is currently " + ", ".join(parts) + "."
 
 
 @tool("student_learning_state")
-def student_learning_state() -> dict[str, Any]:
-    """Report the current student learning state (read-only).
+def student_learning_state(
+    classroom_id: int,
+    assignment_id: int,
+    question_id: int,
+    level: int,
+    topic: str = "",
+    evidence: str = "",
+) -> dict[str, Any]:
+    """Persist the conversational learning level for the authenticated student.
 
-    Use this when the student asks about their current level, progress,
-    quiz score, or whether teacher support is active. Takes no arguments.
+    Assess FIRST from what the STUDENT actually wrote, then record:
+    level 2 = needs hints/scaffolding, 3 = still struggling after guidance /
+    practice recommended, 4 = substantial persistent difficulty.
+    Level 1 (doubt cleared) is RESERVED: it requires `evidence` — a short
+    quote or concrete paraphrase showing the student reasoned correctly,
+    restated the concept correctly, applied it to a new problem, or resolved
+    a misconception. Explaining something yourself is NOT evidence. Never
+    base levels on quiz scores; never overwrite quiz-determined levels.
     """
-    state = _LEARNING_STATE_CONTEXT
-    if not state:
+    global _LEARNING_STATE_WRITES
+    scope = _learning_state_scope()
+    if not scope:
         return {
-            "available": False,
-            "summary": (
-                "No learning-state snapshot was provided for this session, "
-                "so no progress details are available."
+            "status": "rejected",
+            "reason": "no_authorized_scope",
+            "detail": (
+                "No authorized write scope was provided for this session; "
+                "the learning state cannot be persisted."
             ),
         }
 
-    return {
-        "available": True,
-        "level": state.get("level"),
-        "quiz_score": state.get("quiz_score"),
-        "initial_attempt": state.get("initial_attempt"),
-        "teacher_intimated": bool(state.get("teacher_intimated", False)),
-        "attention_priority": state.get("attention_priority", "normal"),
-        "teacher_support_active": (
-            bool(state.get("teacher_intimated", False))
-            or state.get("level") == 4
-        ),
-        "summary": _learning_state_summary(state),
-    }
+    # The LLM may only confirm the current context's identifiers — anything
+    # that does not match the backend-injected scope is rejected outright.
+    for key in ("classroom_id", "assignment_id", "question_id"):
+        if key in scope and scope[key] is not None \
+                and int(locals()[key]) != int(scope[key]):
+            return {
+                "status": "rejected",
+                "reason": f"{key}_outside_authorized_scope",
+            }
+
+    clean_evidence = _sanitize_text(evidence, 400)
+    if int(level) == 1 and len(clean_evidence) < 20:
+        # Enforced conservatism: Level 1 demands cited evidence of the
+        # STUDENT's understanding — not the tutor's explanation.
+        return {
+            "status": "rejected",
+            "reason": "insufficient_evidence_for_level_1",
+            "detail": (
+                "Level 1 requires a specific quote or paraphrase showing "
+                "the student demonstrated understanding. If such evidence "
+                "does not exist yet, keep helping the student and do not "
+                "record Level 1."
+            ),
+        }
+
+    try:
+        from app.services.learning_state_service import (
+            upsert_student_learning_state,
+        )
+    except ImportError:
+        return {
+            "status": "unavailable",
+            "reason": "persistence_service_unavailable",
+            "detail": "Learning-state persistence is not available in "
+                      "standalone mode.",
+        }
+
+    # Prevent duplicate state writes within a single agent run (Phase 10).
+    # Reserve the slot UNDER THE LOCK before the (slow) service call so two
+    # parallel tool invocations cannot both write. A reservation counts as
+    # one persistence attempt for this run.
+    import threading as _threading
+
+    with _threading.Lock():
+        if _learning_state_writes() >= 1:
+            return {
+                "status": "already_assessed",
+                "reason": "learning_state_already_written_in_this_run",
+                "detail": "The learning state for this question was already "
+                          "recorded in this exchange; skipping the duplicate.",
+            }
+        _LEARNING_STATE_WRITES += 1
+
+    result = upsert_student_learning_state(
+        student_id=scope["student_id"],
+        classroom_id=int(classroom_id),
+        assignment_id=int(assignment_id),
+        question_id=int(question_id),
+        level=int(level),
+        topic=_sanitize_text(topic, 120) or None,
+        trusted_subject=scope.get("subject"),
+    )
+    if isinstance(result, dict) and result.get("level") == 1:
+        result["evidence"] = clean_evidence
+    return result
 
 
 # ===========================================================================
@@ -128,7 +210,7 @@ def student_learning_state() -> dict[str, Any]:
 # - Missing fields stay None. Nothing is ever invented.
 
 _OFFICIAL_DOMAIN_HINTS = (
-    "gov.in", ".gov", "nic.in", ".edu", "ac.in", ".edu.in",
+    "gov.in", ".gov", "nic.in", "ac.in",
     "scholarships.gov.in", "ugc.ac.in", "cbse.gov.in", "aicte-india.org",
 )
 

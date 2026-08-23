@@ -146,13 +146,20 @@ def seeded(e2e_db):
                                     question_text="Explain hydrogen bonding.",
                                     subject="Chemistry",
                                     topic="Chemical Bonding")
-    db.add_all([q_a, q_b])
+    # Third question with NO progress row (for create-case testing).
+    q_c = models.AssignmentQuestion(assignment_id=assignment.id,
+                                    question_number="3",
+                                    question_text="Explain ionic bonding.",
+                                    subject="Chemistry",
+                                    topic="Chemical Bonding")
+    db.add_all([q_a, q_b, q_c])
     db.commit()
     db.refresh(q_a)
     db.refresh(q_b)
+    db.refresh(q_c)
 
     # Real question IDs ONLY — never None.
-    assert q_a.id is not None and q_b.id is not None
+    assert q_a.id is not None and q_b.id is not None and q_c.id is not None
 
     p_a = models.StudentQuestionProgress(
         classroom_id=classroom.id, assignment_id=assignment.id,
@@ -170,7 +177,7 @@ def seeded(e2e_db):
     return {"teacher": teacher, "student_a": student_a,
             "student_b": student_b, "outsider": outsider,
             "classroom": classroom, "assignment": assignment,
-            "question_a": q_a, "question_b": q_b,
+            "question_a": q_a, "question_b": q_b, "question_c": q_c,
             "progress_a": p_a, "progress_b": p_b}
 
 
