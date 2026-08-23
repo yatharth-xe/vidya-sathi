@@ -1,0 +1,31 @@
+# Node/Frontend dependency and build dirs
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Python/Backend dependency and build dirs
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/.venv/
+backend/venv/
+backend/ENV/
+backend/env/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/app/__pycache__/
+
+# IDEs and local configurations
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+.env
+.env.local
+*.log
