@@ -1457,30 +1457,26 @@ Avoid hardcoded/fake metrics when the metric should be derived from the database
 Before a live demo:
 
 ```text
-[ ] Backend starts successfully
-[ ] Frontend starts successfully
-[ ] Swagger opens
-[ ] Teacher can log in
-[ ] Teacher dashboard loads
-[ ] Classroom exists
-[ ] Assignment exists
-[ ] PDF exists in backend/uploads
-[ ] Questions exist
-[ ] Student can log in
-[ ] Student can open assignment
-[ ] PDF displays
-[ ] Ask Doubt works
-[ ] NCERT citations display
-[ ] Scholarship search works
-[ ] Learning-state persists
+[.] Backend starts successfully
+[.] Frontend starts successfully
+[.] Swagger opens
+[.] Teacher can log in
+[.] Teacher dashboard loads
+[.] Classroom exists
+[.] Assignment exists
+[.] PDF exists in backend/uploads
+[.] Questions exist
+[.] Student can log in
+[.] Student can open assignment
+[.] PDF displays
+[.] Ask Doubt works
+[.] NCERT citations display
+[.] Scholarship search works
+[.] Learning-state persists
 [ ] Level 3/4 teacher intimation works
 [ ] Practice quiz works
 [ ] Teacher notifications appear
 [ ] Teacher Agent insights load
-[ ] No secrets are committed
-[ ] Git status is clean or only intentional changes exist
-```
-
-## License / Project Ownership
-
-Add the team's official license and contribution policy here if the repository receives one.
+[.] No secrets are committed
+[.] Git status is clean or only intentional changes exist
+``
